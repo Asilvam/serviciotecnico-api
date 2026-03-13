@@ -16,8 +16,9 @@ import { ProductsModule } from './products/products.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'better-sqlite3',
-        database: config.get<string>('DATABASE_PATH', 'serviciotecnico.db'),
+        type: 'mongodb',
+        url: config.get<string>('MONGODB_URI', 'mongodb://localhost:27017'),
+        database: config.get<string>('MONGODB_DB', 'serviciotecnico'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get<string>('NODE_ENV') !== 'production',
       }),

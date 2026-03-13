@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   UseGuards,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -36,14 +35,14 @@ export class TechniciansController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get technician by ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id') id: string) {
     return this.techniciansService.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update technician' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateTechnicianDto: UpdateTechnicianDto,
   ) {
     return this.techniciansService.update(id, updateTechnicianDto);
@@ -51,7 +50,7 @@ export class TechniciansController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Deactivate technician' })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id') id: string) {
     return this.techniciansService.remove(id);
   }
 }

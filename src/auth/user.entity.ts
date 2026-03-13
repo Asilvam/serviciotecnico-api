@@ -1,10 +1,12 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
+import { ObjectId } from 'mongodb';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -14,8 +16,15 @@ export enum UserRole {
 
 @Entity('users')
 export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ObjectIdColumn()
+  @Transform(({ value }: { value: ObjectId }) => value?.toHexString?.(), {
+    toPlainOnly: true,
+  })
+  _id?: ObjectId;
+
+  get id(): string | undefined {
+    return this._id?.toHexString();
+  }
 
   @Column({ unique: true })
   email: string;
@@ -27,10 +36,10 @@ export class User {
   name: string;
 
   @Column({ type: 'text', default: UserRole.RECEPTIONIST })
-  role: UserRole;
+  role: UserRole = UserRole.RECEPTIONIST;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
 
   @CreateDateColumn()
   createdAt: Date;

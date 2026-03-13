@@ -10,7 +10,7 @@ Backend REST API built with [NestJS](https://nestjs.com/) for managing a technic
 - 📦 **Products/Parts** — Inventory management with stock control
 - 📋 **Service Orders** — Full repair order lifecycle with status tracking
 - 📖 **Swagger UI** — Interactive API documentation at `/api`
-- 🗄️ **SQLite** (dev) / **PostgreSQL** (prod) via TypeORM
+- 🗄️ **MongoDB Atlas** via TypeORM
 
 ## Getting Started
 
@@ -37,7 +37,8 @@ cp .env.example .env
 |-----------------|-------------------------------------|----------------------|
 | `PORT`          | HTTP server port                    | `3000`               |
 | `NODE_ENV`      | Environment                         | `development`        |
-| `DATABASE_PATH` | SQLite file path (dev only)         | `serviciotecnico.db` |
+| `MONGODB_URI`   | MongoDB Atlas connection string     | `mongodb://localhost:27017` |
+| `MONGODB_DB`    | MongoDB database name               | `serviciotecnico` |
 | `JWT_SECRET`    | Secret key for JWT token signing    | `changeme`           |
 
 ### Running the App
@@ -63,22 +64,22 @@ Once the app is running, visit **http://localhost:3000/api** for the Swagger UI.
 | GET    | `/auth/profile`              | Get current user profile       |
 | GET    | `/customers`                 | List all customers             |
 | POST   | `/customers`                 | Create a customer              |
-| GET    | `/customers/:id`             | Get customer by ID             |
+| GET    | `/customers/:id`             | Get customer by ID (ObjectId)  |
 | PATCH  | `/customers/:id`             | Update customer                |
 | DELETE | `/customers/:id`             | Deactivate customer            |
 | GET    | `/technicians`               | List all technicians           |
 | POST   | `/technicians`               | Create a technician            |
-| GET    | `/technicians/:id`           | Get technician by ID           |
+| GET    | `/technicians/:id`           | Get technician by ID (ObjectId) |
 | PATCH  | `/technicians/:id`           | Update technician              |
 | DELETE | `/technicians/:id`           | Deactivate technician          |
 | GET    | `/products`                  | List all products/parts        |
 | POST   | `/products`                  | Create a product               |
-| GET    | `/products/:id`              | Get product by ID              |
+| GET    | `/products/:id`              | Get product by ID (ObjectId)   |
 | PATCH  | `/products/:id`              | Update product                 |
 | DELETE | `/products/:id`              | Deactivate product             |
 | GET    | `/service-orders`            | List service orders            |
 | POST   | `/service-orders`            | Create a service order         |
-| GET    | `/service-orders/:id`        | Get service order by ID        |
+| GET    | `/service-orders/:id`        | Get service order by ID (ObjectId) |
 | PATCH  | `/service-orders/:id`        | Update service order           |
 | DELETE | `/service-orders/:id`        | Cancel service order           |
 

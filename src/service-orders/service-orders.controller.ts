@@ -7,11 +7,15 @@ import {
   Param,
   Delete,
   UseGuards,
-  ParseIntPipe,
   Query,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ServiceOrdersService } from './service-orders.service';
 import { CreateServiceOrderDto } from './dto/create-service-order.dto';
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
@@ -33,10 +37,10 @@ export class ServiceOrdersController {
   @Get()
   @ApiOperation({ summary: 'Get all service orders' })
   @ApiQuery({ name: 'status', enum: ServiceOrderStatus, required: false })
-  @ApiQuery({ name: 'customerId', type: Number, required: false })
+  @ApiQuery({ name: 'customerId', type: String, required: false })
   findAll(
     @Query('status') status?: ServiceOrderStatus,
-    @Query('customerId') customerId?: number,
+    @Query('customerId') customerId?: string,
   ) {
     if (status) {
       return this.serviceOrdersService.findByStatus(status);
@@ -49,14 +53,14 @@ export class ServiceOrdersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get service order by ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id') id: string) {
     return this.serviceOrdersService.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update service order' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateServiceOrderDto: UpdateServiceOrderDto,
   ) {
     return this.serviceOrdersService.update(id, updateServiceOrderDto);
@@ -64,7 +68,7 @@ export class ServiceOrdersController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Cancel service order' })
-  cancel(@Param('id', ParseIntPipe) id: number) {
+  cancel(@Param('id') id: string) {
     return this.serviceOrdersService.cancel(id);
   }
 }

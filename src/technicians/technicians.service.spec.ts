@@ -5,7 +5,7 @@ import { TechniciansService } from './technicians.service';
 import { Technician, TechnicianSpecialty } from './technician.entity';
 
 const mockTechnician: Technician = {
-  id: 1,
+  id: '67d0f4a5f99f719467f91a05',
   name: 'Carlos Técnico',
   email: 'carlos@example.com',
   phone: '+56987654321',
@@ -75,13 +75,13 @@ describe('TechniciansService', () => {
   describe('findOne', () => {
     it('should return a technician by id', async () => {
       mockTechnicianRepository.findOne.mockResolvedValue(mockTechnician);
-      const result = await service.findOne(1);
+      const result = await service.findOne('67d0f4a5f99f719467f91a05');
       expect(result).toEqual(mockTechnician);
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockTechnicianRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -91,18 +91,22 @@ describe('TechniciansService', () => {
       mockTechnicianRepository.findOne.mockResolvedValue(mockTechnician);
       mockTechnicianRepository.save.mockResolvedValue(updated);
 
-      const result = await service.update(1, { name: 'Updated Name' });
+      const result = await service.update('67d0f4a5f99f719467f91a05', { name: 'Updated Name' });
       expect(result.name).toBe('Updated Name');
     });
 
     it('should throw ConflictException if updated email already exists', async () => {
-      const otherTechnician = { ...mockTechnician, id: 2, email: 'other@example.com' };
+      const otherTechnician = {
+        ...mockTechnician,
+        id: '67d0f4a5f99f719467f91a06',
+        email: 'other@example.com',
+      };
       mockTechnicianRepository.findOne
         .mockResolvedValueOnce(mockTechnician)
         .mockResolvedValueOnce(otherTechnician);
 
       await expect(
-        service.update(1, { email: 'other@example.com' }),
+        service.update('67d0f4a5f99f719467f91a05', { email: 'other@example.com' }),
       ).rejects.toThrow(ConflictException);
     });
   });

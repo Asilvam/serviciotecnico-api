@@ -5,7 +5,7 @@ import { CustomersService } from './customers.service';
 import { Customer } from './customer.entity';
 
 const mockCustomer: Customer = {
-  id: 1,
+  id: '67d0f4a5f99f719467f91a02',
   name: 'Juan Pérez',
   email: 'juan@example.com',
   phone: '+56912345678',
@@ -75,13 +75,13 @@ describe('CustomersService', () => {
   describe('findOne', () => {
     it('should return a customer by id', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
-      const result = await service.findOne(1);
+      const result = await service.findOne('67d0f4a5f99f719467f91a02');
       expect(result).toEqual(mockCustomer);
     });
 
     it('should throw NotFoundException if customer not found', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -91,18 +91,22 @@ describe('CustomersService', () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
       mockCustomerRepository.save.mockResolvedValue(updated);
 
-      const result = await service.update(1, { name: 'Updated Name' });
+      const result = await service.update('67d0f4a5f99f719467f91a02', { name: 'Updated Name' });
       expect(result.name).toBe('Updated Name');
     });
 
     it('should throw ConflictException if updated email already exists', async () => {
-      const otherCustomer = { ...mockCustomer, id: 2, email: 'other@example.com' };
+      const otherCustomer = {
+        ...mockCustomer,
+        id: '67d0f4a5f99f719467f91a03',
+        email: 'other@example.com',
+      };
       mockCustomerRepository.findOne
         .mockResolvedValueOnce(mockCustomer)
         .mockResolvedValueOnce(otherCustomer);
 
       await expect(
-        service.update(1, { email: 'other@example.com' }),
+        service.update('67d0f4a5f99f719467f91a02', { email: 'other@example.com' }),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -112,7 +116,7 @@ describe('CustomersService', () => {
       mockCustomerRepository.findOne.mockResolvedValue({ ...mockCustomer });
       mockCustomerRepository.save.mockResolvedValue({ ...mockCustomer, isActive: false });
 
-      await service.remove(1);
+      await service.remove('67d0f4a5f99f719467f91a02');
       expect(mockCustomerRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ isActive: false }),
       );

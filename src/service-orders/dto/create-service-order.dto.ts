@@ -8,16 +8,16 @@ import {
   IsArray,
   ValidateNested,
   Min,
+  IsMongoId,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ServiceOrderPriority } from '../service-order.entity';
 
 export class ServiceOrderItemDto {
-  @ApiProperty({ example: 1 })
-  @IsNumber()
-  @IsPositive()
-  productId: number;
+  @ApiProperty({ example: '67d0f4a5f99f719467f91a11' })
+  @IsMongoId()
+  productId: string;
 
   @ApiProperty({ example: 'Pantalla LCD 15"' })
   @IsString()
@@ -38,16 +38,14 @@ export class ServiceOrderItemDto {
 }
 
 export class CreateServiceOrderDto {
-  @ApiProperty({ example: 1 })
-  @IsNumber()
-  @IsPositive()
-  customerId: number;
+  @ApiProperty({ example: '67d0f4a5f99f719467f91a22' })
+  @IsMongoId()
+  customerId: string;
 
-  @ApiPropertyOptional({ example: 1 })
+  @ApiPropertyOptional({ example: '67d0f4a5f99f719467f91a33' })
   @IsOptional()
-  @IsNumber()
-  @IsPositive()
-  technicianId?: number;
+  @IsMongoId()
+  technicianId?: string;
 
   @ApiProperty({ example: 'Laptop' })
   @IsString()

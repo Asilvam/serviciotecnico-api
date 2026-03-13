@@ -1,15 +1,12 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToOne,
-  JoinColumn,
-  OneToMany,
 } from 'typeorm';
-import { Customer } from '../customers/customer.entity';
-import { Technician } from '../technicians/technician.entity';
+import { Transform } from 'class-transformer';
+import { ObjectId } from 'mongodb';
 
 export enum ServiceOrderStatus {
   PENDING = 'pending',
@@ -27,21 +24,14 @@ export enum ServiceOrderPriority {
   URGENT = 'urgent',
 }
 
-@Entity('service_order_items')
 export class ServiceOrderItem {
-  @PrimaryGeneratedColumn()
-  id: number;
-
   @Column()
-  serviceOrderId: number;
-
-  @Column()
-  productId: number;
+  productId: string;
 
   @Column()
   productName: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column()
   unitPrice: number;
 
   @Column({ default: 1 })
@@ -50,25 +40,24 @@ export class ServiceOrderItem {
 
 @Entity('service_orders')
 export class ServiceOrder {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ObjectIdColumn()
+  @Transform(({ value }: { value: ObjectId }) => value?.toHexString?.(), {
+    toPlainOnly: true,
+  })
+  _id?: ObjectId;
+
+  get id(): string | undefined {
+    return this._id?.toHexString();
+  }
 
   @Column({ unique: true })
   orderNumber: string;
 
   @Column()
-  customerId: number;
-
-  @ManyToOne(() => Customer, { eager: true })
-  @JoinColumn({ name: 'customerId' })
-  customer: Customer;
+  customerId: string;
 
   @Column({ nullable: true })
-  technicianId: number;
-
-  @ManyToOne(() => Technician, { eager: true, nullable: true })
-  @JoinColumn({ name: 'technicianId' })
-  technician: Technician;
+  technicianId: string;
 
   @Column()
   deviceType: string;
@@ -97,19 +86,16 @@ export class ServiceOrder {
   @Column({ type: 'text', default: ServiceOrderPriority.MEDIUM })
   priority: ServiceOrderPriority;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ default: 0 })
   laborCost: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ default: 0 })
   partsCost: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ default: 0 })
   totalCost: number;
 
-  @OneToMany(() => ServiceOrderItem, (item) => item.serviceOrderId, {
-    cascade: true,
-    eager: true,
-  })
+  @Column()
   items: ServiceOrderItem[];
 
   @Column({ nullable: true })

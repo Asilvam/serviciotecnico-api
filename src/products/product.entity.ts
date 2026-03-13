@@ -1,15 +1,24 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
+import { ObjectId } from 'mongodb';
 
 @Entity('products')
 export class Product {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ObjectIdColumn()
+  @Transform(({ value }: { value: ObjectId }) => value?.toHexString?.(), {
+    toPlainOnly: true,
+  })
+  _id?: ObjectId;
+
+  get id(): string | undefined {
+    return this._id?.toHexString();
+  }
 
   @Column()
   name: string;
@@ -20,7 +29,7 @@ export class Product {
   @Column({ unique: true })
   sku: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column()
   price: number;
 
   @Column({ default: 0 })

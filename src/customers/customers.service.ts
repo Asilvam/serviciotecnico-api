@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Customer } from './customer.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { toObjectId } from '../common/mongo-id.util';
 
 @Injectable()
 export class CustomersService {
@@ -31,15 +32,20 @@ export class CustomersService {
     return this.customerRepository.find({ where: { isActive: true } });
   }
 
-  async findOne(id: number): Promise<Customer> {
-    const customer = await this.customerRepository.findOne({ where: { id } });
+  async findOne(id: string): Promise<Customer> {
+    const objectId = toObjectId(id);
+    if (!objectId) {
+      throw new NotFoundException(`Customer #${id} not found`);
+    }
+
+    const customer = await this.customerRepository.findOne({ where: { _id: objectId } });
     if (!customer) {
       throw new NotFoundException(`Customer #${id} not found`);
     }
     return customer;
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
+  async update(id: string, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
     const customer = await this.findOne(id);
     if (updateCustomerDto.email && updateCustomerDto.email !== customer.email) {
       const existing = await this.customerRepository.findOne({
@@ -53,7 +59,7 @@ export class CustomersService {
     return this.customerRepository.save(customer);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const customer = await this.findOne(id);
     customer.isActive = false;
     await this.customerRepository.save(customer);

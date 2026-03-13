@@ -1,10 +1,12 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
+import { ObjectId } from 'mongodb';
 
 export enum TechnicianSpecialty {
   ELECTRONICS = 'electronics',
@@ -15,8 +17,15 @@ export enum TechnicianSpecialty {
 
 @Entity('technicians')
 export class Technician {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ObjectIdColumn()
+  @Transform(({ value }: { value: ObjectId }) => value?.toHexString?.(), {
+    toPlainOnly: true,
+  })
+  _id?: ObjectId;
+
+  get id(): string | undefined {
+    return this._id?.toHexString();
+  }
 
   @Column()
   name: string;

@@ -3,19 +3,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   ServiceOrder,
-  ServiceOrderItem,
   ServiceOrderStatus,
 } from './service-order.entity';
 import { CreateServiceOrderDto } from './dto/create-service-order.dto';
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
+import { toObjectId } from '../common/mongo-id.util';
 
 @Injectable()
 export class ServiceOrdersService {
   constructor(
     @InjectRepository(ServiceOrder)
     private serviceOrderRepository: Repository<ServiceOrder>,
-    @InjectRepository(ServiceOrderItem)
-    private serviceOrderItemRepository: Repository<ServiceOrderItem>,
   ) {}
 
   private generateOrderNumber(): string {
@@ -47,20 +45,12 @@ export class ServiceOrdersService {
       order.totalCost = partsCost + (order.laborCost || 0);
     }
 
-    const savedOrder = await this.serviceOrderRepository.save(order);
+    order.items = (items || []).map((item) => ({
+      ...item,
+      quantity: item.quantity || 1,
+    }));
 
-    if (items && items.length > 0) {
-      const orderItems = items.map((item) =>
-        this.serviceOrderItemRepository.create({
-          ...item,
-          quantity: item.quantity || 1,
-          serviceOrderId: savedOrder.id,
-        }),
-      );
-      savedOrder.items = await this.serviceOrderItemRepository.save(orderItems);
-    }
-
-    return savedOrder;
+    return this.serviceOrderRepository.save(order);
   }
 
   async findAll(): Promise<ServiceOrder[]> {
@@ -69,8 +59,13 @@ export class ServiceOrdersService {
     });
   }
 
-  async findOne(id: number): Promise<ServiceOrder> {
-    const order = await this.serviceOrderRepository.findOne({ where: { id } });
+  async findOne(id: string): Promise<ServiceOrder> {
+    const objectId = toObjectId(id);
+    if (!objectId) {
+      throw new NotFoundException(`Service Order #${id} not found`);
+    }
+
+    const order = await this.serviceOrderRepository.findOne({ where: { _id: objectId } });
     if (!order) {
       throw new NotFoundException(`Service Order #${id} not found`);
     }
@@ -84,7 +79,7 @@ export class ServiceOrdersService {
     });
   }
 
-  async findByCustomer(customerId: number): Promise<ServiceOrder[]> {
+  async findByCustomer(customerId: string): Promise<ServiceOrder[]> {
     return this.serviceOrderRepository.find({
       where: { customerId },
       order: { createdAt: 'DESC' },
@@ -92,7 +87,7 @@ export class ServiceOrdersService {
   }
 
   async update(
-    id: number,
+    id: string,
     updateServiceOrderDto: UpdateServiceOrderDto,
   ): Promise<ServiceOrder> {
     const order = await this.findOne(id);
@@ -109,7 +104,7 @@ export class ServiceOrdersService {
     return this.serviceOrderRepository.save(order);
   }
 
-  async cancel(id: number): Promise<ServiceOrder> {
+  async cancel(id: string): Promise<ServiceOrder> {
     const order = await this.findOne(id);
     order.status = ServiceOrderStatus.CANCELLED;
     return this.serviceOrderRepository.save(order);

@@ -1,15 +1,24 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  ObjectIdColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
+import { ObjectId } from 'mongodb';
 
 @Entity('customers')
 export class Customer {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ObjectIdColumn()
+  @Transform(({ value }: { value: ObjectId }) => value?.toHexString?.(), {
+    toPlainOnly: true,
+  })
+  _id?: ObjectId;
+
+  get id(): string | undefined {
+    return this._id?.toHexString();
+  }
 
   @Column()
   name: string;

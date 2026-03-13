@@ -5,7 +5,7 @@ import { ProductsService } from './products.service';
 import { Product } from './product.entity';
 
 const mockProduct: Product = {
-  id: 1,
+  id: '67d0f4a5f99f719467f91a04',
   name: 'Pantalla LCD 15"',
   description: 'Pantalla LCD para laptops',
   sku: 'LCD-15-001',
@@ -77,13 +77,13 @@ describe('ProductsService', () => {
   describe('findOne', () => {
     it('should return a product by id', async () => {
       mockProductRepository.findOne.mockResolvedValue(mockProduct);
-      const result = await service.findOne(1);
+      const result = await service.findOne('67d0f4a5f99f719467f91a04');
       expect(result).toEqual(mockProduct);
     });
 
     it('should throw NotFoundException if not found', async () => {
       mockProductRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -92,7 +92,7 @@ describe('ProductsService', () => {
       mockProductRepository.findOne.mockResolvedValue({ ...mockProduct, stock: 10 });
       mockProductRepository.save.mockImplementation((p) => Promise.resolve(p));
 
-      const result = await service.updateStock(1, 5);
+      const result = await service.updateStock('67d0f4a5f99f719467f91a04', 5);
       expect(result.stock).toBe(15);
     });
 
@@ -100,7 +100,7 @@ describe('ProductsService', () => {
       mockProductRepository.findOne.mockResolvedValue({ ...mockProduct, stock: 2 });
       mockProductRepository.save.mockImplementation((p) => Promise.resolve(p));
 
-      const result = await service.updateStock(1, -10);
+      const result = await service.updateStock('67d0f4a5f99f719467f91a04', -10);
       expect(result.stock).toBe(0);
     });
   });

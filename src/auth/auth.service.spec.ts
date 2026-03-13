@@ -7,7 +7,7 @@ import { User, UserRole } from './user.entity';
 import * as bcrypt from 'bcryptjs';
 
 const mockUser: User = {
-  id: 1,
+  id: '67d0f4a5f99f719467f91a01',
   email: 'test@example.com',
   password: '$2a$10$abcdefghij',
   name: 'Test User',
