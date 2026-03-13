@@ -36,7 +36,7 @@ export class Product {
   stock: number;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
 
   @CreateDateColumn()
   createdAt: Date;
