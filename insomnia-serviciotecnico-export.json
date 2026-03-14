@@ -1,0 +1,350 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-03-13T00:00:00.000Z",
+  "__export_source": "serviciotecnico-api",
+  "resources": [
+    {
+      "_id": "wrk_serviciotecnico",
+      "_type": "workspace",
+      "name": "Servicio Tecnico API",
+      "description": "Coleccion para probar auth, catalogos y ordenes con Bearer JWT.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_serviciotecnico_base",
+      "_type": "environment",
+      "parentId": "wrk_serviciotecnico",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3500",
+        "token": "",
+        "customer_id": "",
+        "technician_id": "",
+        "product_id": "",
+        "order_id": ""
+      }
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "01 - Auth"
+    },
+    {
+      "_id": "req_auth_register",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Register",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/register",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@test.com\",\n  \"password\": \"123456\",\n  \"name\": \"Admin Prueba\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_auth_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@test.com\",\n  \"password\": \"123456\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_auth_profile",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Profile",
+      "method": "GET",
+      "url": "{{ _.base_url }}/auth/profile",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "fld_customers",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "02 - Customers"
+    },
+    {
+      "_id": "req_customers_create",
+      "_type": "request",
+      "parentId": "fld_customers",
+      "name": "Create Customer",
+      "method": "POST",
+      "url": "{{ _.base_url }}/customers",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Juan Perez\",\n  \"email\": \"juan.perez@test.com\",\n  \"phone\": \"+56911111111\",\n  \"address\": \"Santiago\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_customers_list",
+      "_type": "request",
+      "parentId": "fld_customers",
+      "name": "List Customers",
+      "method": "GET",
+      "url": "{{ _.base_url }}/customers",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_customers_get",
+      "_type": "request",
+      "parentId": "fld_customers",
+      "name": "Get Customer By ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/customers/{{ _.customer_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "fld_technicians",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "03 - Technicians"
+    },
+    {
+      "_id": "req_technicians_create",
+      "_type": "request",
+      "parentId": "fld_technicians",
+      "name": "Create Technician",
+      "method": "POST",
+      "url": "{{ _.base_url }}/technicians",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Carlos Tecnico\",\n  \"email\": \"carlos.tecnico@test.com\",\n  \"phone\": \"+56922222222\",\n  \"specialty\": \"computing\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_technicians_list",
+      "_type": "request",
+      "parentId": "fld_technicians",
+      "name": "List Technicians",
+      "method": "GET",
+      "url": "{{ _.base_url }}/technicians",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_technicians_get",
+      "_type": "request",
+      "parentId": "fld_technicians",
+      "name": "Get Technician By ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/technicians/{{ _.technician_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "fld_products",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "04 - Products"
+    },
+    {
+      "_id": "req_products_create",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Create Product",
+      "method": "POST",
+      "url": "{{ _.base_url }}/products",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Pantalla LCD 15\",\n  \"description\": \"Repuesto\",\n  \"sku\": \"LCD-15-001\",\n  \"price\": 25000,\n  \"stock\": 10\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_products_list",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "List Products",
+      "method": "GET",
+      "url": "{{ _.base_url }}/products",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_products_get",
+      "_type": "request",
+      "parentId": "fld_products",
+      "name": "Get Product By ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/products/{{ _.product_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "fld_orders",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "05 - Service Orders"
+    },
+    {
+      "_id": "req_orders_create",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Create Service Order",
+      "method": "POST",
+      "url": "{{ _.base_url }}/service-orders",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"customerId\": \"{{ _.customer_id }}\",\n  \"technicianId\": \"{{ _.technician_id }}\",\n  \"deviceType\": \"Laptop\",\n  \"deviceBrand\": \"HP\",\n  \"deviceModel\": \"Pavilion 15\",\n  \"problemDescription\": \"No enciende\",\n  \"priority\": \"medium\",\n  \"items\": [\n    {\n      \"productId\": \"{{ _.product_id }}\",\n      \"productName\": \"Pantalla LCD 15\",\n      \"unitPrice\": 25000,\n      \"quantity\": 1\n    }\n  ]\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_orders_list",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "List Service Orders",
+      "method": "GET",
+      "url": "{{ _.base_url }}/service-orders",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_orders_list_status",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "List Service Orders By Status",
+      "method": "GET",
+      "url": "{{ _.base_url }}/service-orders?status=pending",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_orders_list_customer",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "List Service Orders By Customer",
+      "method": "GET",
+      "url": "{{ _.base_url }}/service-orders?customerId={{ _.customer_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_orders_get",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Get Service Order By ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_orders_update",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Update Service Order",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"in_progress\",\n  \"diagnosis\": \"Falla en placa\",\n  \"laborCost\": 15000\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_orders_cancel",
+      "_type": "request",
+      "parentId": "fld_orders",
+      "name": "Cancel Service Order",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    }
+  ]
+}
+
