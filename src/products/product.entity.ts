@@ -33,7 +33,7 @@ export class Product {
   price: number;
 
   @Column({ default: 0 })
-  stock: number;
+  stock: number = 0;
 
   @Column({ default: true })
   isActive: boolean = true;
