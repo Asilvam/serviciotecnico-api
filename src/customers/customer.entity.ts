@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Transform } from 'class-transformer';
 import { ObjectId } from 'mongodb';
+import { IsOptional } from 'class-validator';
 
 @Entity('customers')
 export class Customer {
@@ -33,7 +34,7 @@ export class Customer {
   address: string;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
 
   @CreateDateColumn()
   createdAt: Date;

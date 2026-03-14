@@ -37,10 +37,10 @@ export class Technician {
   phone: string;
 
   @Column({ type: 'text', default: TechnicianSpecialty.GENERAL })
-  specialty: TechnicianSpecialty;
+  specialty: TechnicianSpecialty = TechnicianSpecialty.GENERAL;
 
   @Column({ default: true })
-  isActive: boolean;
+  isActive: boolean = true;
 
   @CreateDateColumn()
   createdAt: Date;

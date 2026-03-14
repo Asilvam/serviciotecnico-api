@@ -1,10 +1,4 @@
-import {
-  Entity,
-  ObjectIdColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Transform } from 'class-transformer';
 import { ObjectId } from 'mongodb';
 
@@ -35,7 +29,7 @@ export class ServiceOrderItem {
   unitPrice: number;
 
   @Column({ default: 1 })
-  quantity: number;
+  quantity: number = 1;
 }
 
 @Entity('service_orders')
@@ -81,19 +75,19 @@ export class ServiceOrder {
   workDone: string;
 
   @Column({ type: 'text', default: ServiceOrderStatus.PENDING })
-  status: ServiceOrderStatus;
+  status: ServiceOrderStatus = ServiceOrderStatus.PENDING;
 
   @Column({ type: 'text', default: ServiceOrderPriority.MEDIUM })
-  priority: ServiceOrderPriority;
+  priority: ServiceOrderPriority = ServiceOrderPriority.MEDIUM;
 
   @Column({ default: 0 })
-  laborCost: number;
+  laborCost: number = 0;
 
   @Column({ default: 0 })
-  partsCost: number;
+  partsCost: number = 0;
 
   @Column({ default: 0 })
-  totalCost: number;
+  totalCost: number = 0;
 
   @Column()
   items: ServiceOrderItem[];
