@@ -2,32 +2,31 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { ServiceOrdersService } from './service-orders.service';
-import {
-  ServiceOrder,
-  ServiceOrderStatus,
-  ServiceOrderPriority,
-} from './service-order.entity';
+import { ServiceOrder, ServiceOrderStatus, ServiceOrderPriority } from './service-order.entity';
+import { Customer } from '../customers/customer.entity';
+import { Technician } from '../technicians/technician.entity';
+import { AuditService } from '../audit/audit.service';
 
 const mockOrder: ServiceOrder = {
   id: '67d0f4a5f99f719467f91a07',
   orderNumber: 'OT-20250101-0001',
   customerId: '67d0f4a5f99f719467f91a02',
-  technicianId: undefined,
+  technicianId: '',
   deviceType: 'Laptop',
   deviceBrand: 'HP',
   deviceModel: 'Pavilion 15',
   serialNumber: 'ABC123',
   problemDescription: 'No enciende',
-  diagnosis: undefined,
-  workDone: undefined,
+  diagnosis: '',
+  workDone: '',
   status: ServiceOrderStatus.PENDING,
   priority: ServiceOrderPriority.MEDIUM,
   laborCost: 0,
   partsCost: 0,
   totalCost: 0,
   items: [],
-  estimatedDelivery: undefined,
-  deliveredAt: undefined,
+  estimatedDelivery: new Date(),
+  deliveredAt: new Date(),
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -37,6 +36,18 @@ const mockOrderRepository = {
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+};
+
+const mockCustomerRepository = {
+  findOne: jest.fn(),
+};
+
+const mockTechnicianRepository = {
+  findOne: jest.fn(),
+};
+
+const mockAuditService = {
+  record: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('ServiceOrdersService', () => {
@@ -49,6 +60,18 @@ describe('ServiceOrdersService', () => {
         {
           provide: getRepositoryToken(ServiceOrder),
           useValue: mockOrderRepository,
+        },
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: mockCustomerRepository,
+        },
+        {
+          provide: getRepositoryToken(Technician),
+          useValue: mockTechnicianRepository,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();

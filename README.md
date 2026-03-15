@@ -83,6 +83,7 @@ Once the app is running, visit **http://localhost:3000/api** for the Swagger UI.
 | PATCH  | `/service-orders/:id`        | Update service order           |
 | DELETE | `/service-orders/:id`        | Cancel service order           |
 | POST   | `/service-orders/:id/print-58mm` | Generate thermal ticket 58mm |
+| GET    | `/audit-logs`                | List audit logs (admin only)   |
 
 ### Frontend Print Flow (58mm)
 
