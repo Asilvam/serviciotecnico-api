@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TechniciansService } from './technicians.service';
@@ -41,10 +32,7 @@ export class TechniciansController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update technician' })
-  update(
-    @Param('id') id: string,
-    @Body() updateTechnicianDto: UpdateTechnicianDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateTechnicianDto: UpdateTechnicianDto) {
     return this.techniciansService.update(id, updateTechnicianDto);
   }
 

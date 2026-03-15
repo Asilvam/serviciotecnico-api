@@ -242,6 +242,96 @@
       "name": "05 - Service Orders"
     },
     {
+      "_id": "fld_orders_printing",
+      "_type": "request_group",
+      "parentId": "fld_orders",
+      "name": "05.1 - Printing"
+    },
+    {
+      "_id": "fld_orders_printing_flow",
+      "_type": "request_group",
+      "parentId": "fld_orders_printing",
+      "name": "05.1.1 - Test Flow (E2E)"
+    },
+    {
+      "_id": "req_flow_login",
+      "_type": "request",
+      "parentId": "fld_orders_printing_flow",
+      "name": "01 - Login",
+      "description": "Ejecuta primero. Copia accessToken en la variable de entorno token.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@test.com\",\n  \"password\": \"123456\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_flow_create_customer",
+      "_type": "request",
+      "parentId": "fld_orders_printing_flow",
+      "name": "02 - Create Customer",
+      "description": "Ejecuta con Bearer token. Copia _id o id en customer_id.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/customers",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Cliente Flujo 58mm\",\n  \"email\": \"cliente.flujo58@test.com\",\n  \"phone\": \"3001234567\",\n  \"address\": \"Direccion de prueba\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_flow_create_order",
+      "_type": "request",
+      "parentId": "fld_orders_printing_flow",
+      "name": "03 - Create Service Order",
+      "description": "Usa customer_id. Copia order.id (o _id) en order_id.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/service-orders",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"customerId\": \"{{ _.customer_id }}\",\n  \"deviceType\": \"Laptop\",\n  \"deviceBrand\": \"HP\",\n  \"deviceModel\": \"Pavilion 15\",\n  \"problemDescription\": \"No enciende\",\n  \"priority\": \"medium\",\n  \"items\": [\n    {\n      \"productId\": \"{{ _.product_id }}\",\n      \"productName\": \"Pantalla LCD 15\",\n      \"unitPrice\": 25000,\n      \"quantity\": 1\n    }\n  ]\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_flow_print58",
+      "_type": "request",
+      "parentId": "fld_orders_printing_flow",
+      "name": "04 - Print 58mm Ticket",
+      "description": "Genera el ticket térmico. Valida content, mimeType y width=32.",
+      "method": "POST",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-58mm",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
       "_id": "req_orders_create",
       "_type": "request",
       "parentId": "fld_orders",
@@ -306,6 +396,18 @@
       "name": "Get Service Order By ID",
       "method": "GET",
       "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_orders_print58",
+      "_type": "request",
+      "parentId": "fld_orders_printing",
+      "name": "Print 58mm Ticket",
+      "method": "POST",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-58mm",
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"

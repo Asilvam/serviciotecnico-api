@@ -82,6 +82,14 @@ Once the app is running, visit **http://localhost:3000/api** for the Swagger UI.
 | GET    | `/service-orders/:id`        | Get service order by ID (ObjectId) |
 | PATCH  | `/service-orders/:id`        | Update service order           |
 | DELETE | `/service-orders/:id`        | Cancel service order           |
+| POST   | `/service-orders/:id/print-58mm` | Generate thermal ticket 58mm |
+
+### Frontend Print Flow (58mm)
+
+1. Create the order with `POST /service-orders`.
+2. Read `actions.print58mm.url` from the response.
+3. Call that URL with `POST` and the same bearer token.
+4. Send `content` (plain text, width 32 chars) to your thermal printer.
 
 ## Running Tests
 
