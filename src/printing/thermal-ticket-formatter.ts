@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-export interface Thermal58TicketInput {
+export interface ThermalTicketInput {
   orderId: string;
   orderNumber: string;
   createdAt?: Date;
@@ -30,10 +30,11 @@ export interface Thermal58TicketInput {
 }
 
 @Injectable()
-export class Thermal58Formatter {
-  private readonly width = 32;
+export class ThermalTicketFormatter {
+  private readonly width = 48;
+  private readonly paperWidthMm = 80;
 
-  format(input: Thermal58TicketInput): string {
+  format(input: ThermalTicketInput): string {
     const lines: string[] = [];
 
     lines.push(this.center('SERVICIO TECNICO'));
@@ -116,6 +117,10 @@ export class Thermal58Formatter {
     return this.width;
   }
 
+  getPaperWidthMm(): number {
+    return this.paperWidthMm;
+  }
+
   private separator(char = '-'): string {
     return char.repeat(this.width);
   }
@@ -195,4 +200,3 @@ export class Thermal58Formatter {
     return Math.round(value).toString();
   }
 }
-

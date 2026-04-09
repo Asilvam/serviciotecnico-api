@@ -7,7 +7,7 @@ import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 import { toObjectId } from '../common/mongo-id.util';
 import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
-import type { Thermal58TicketInput } from '../printing/thermal58-formatter';
+import type { ThermalTicketInput } from '../printing/thermal-ticket-formatter';
 import { AuditService } from '../audit/audit.service';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 
@@ -135,7 +135,7 @@ export class ServiceOrdersService {
     return savedOrder;
   }
 
-  async buildPrintPayload(id: string, actor?: AuditActor): Promise<Thermal58TicketInput> {
+  async buildPrintPayload(id: string, actor?: AuditActor): Promise<ThermalTicketInput> {
     const order = await this.findOne(id);
 
     let customerName: string | undefined;

@@ -1,23 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import type { Print58Result } from './interfaces/print58-result.interface';
-import { Thermal58Formatter } from './thermal58-formatter';
-import type { Thermal58TicketInput } from './thermal58-formatter';
+import type { PrintTicketResult } from './interfaces/print-ticket-result.interface';
+import { ThermalTicketFormatter } from './thermal-ticket-formatter';
+import type { ThermalTicketInput } from './thermal-ticket-formatter';
 
 @Injectable()
 export class PrintingService {
-  constructor(private readonly thermal58Formatter: Thermal58Formatter) {}
+  constructor(private readonly thermalTicketFormatter: ThermalTicketFormatter) {}
 
-  generate58mmTicket(payload: Thermal58TicketInput): Print58Result {
-    const content = this.thermal58Formatter.format(payload);
+  generate80mmTicket(payload: ThermalTicketInput): PrintTicketResult {
+    const content = this.thermalTicketFormatter.format(payload);
 
     return {
       orderId: payload.orderId,
       orderNumber: payload.orderNumber,
       mimeType: 'text/plain',
       content,
-      width: this.thermal58Formatter.getWidth(),
+      width: this.thermalTicketFormatter.getWidth(),
+      paperWidthMm: this.thermalTicketFormatter.getPaperWidthMm(),
       generatedAt: new Date().toISOString(),
     };
   }
 }
-
