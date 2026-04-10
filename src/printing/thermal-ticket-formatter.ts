@@ -31,7 +31,7 @@ export interface ThermalTicketInput {
 
 @Injectable()
 export class ThermalTicketFormatter {
-  private readonly width = 48;
+  private readonly width = 40;
   private readonly paperWidthMm = 80;
 
   format(input: ThermalTicketInput): string {

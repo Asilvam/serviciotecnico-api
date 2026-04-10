@@ -32,11 +32,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: getRepositoryToken(User), useValue: mockUserRepository },
-        { provide: JwtService, useValue: mockJwtService },
-      ],
+      providers: [AuthService, { provide: getRepositoryToken(User), useValue: mockUserRepository }, { provide: JwtService, useValue: mockJwtService }],
     }).compile();
 
     service = module.get<AuthService>(AuthService);

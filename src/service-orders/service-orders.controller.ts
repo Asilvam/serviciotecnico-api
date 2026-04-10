@@ -85,10 +85,10 @@ export class ServiceOrdersController {
   }
 
   @Post(':id/print-80mm')
-  @ApiOperation({ summary: 'Generate 80mm thermal ticket for a service order' })
+  @ApiOperation({ summary: 'Generate and dispatch 80mm thermal ticket for a service order' })
   @ApiParam({ name: 'id', type: String, description: 'Service order ObjectId' })
   async print80mm(@Param('id') id: string, @Req() req: Request): Promise<PrintTicketResult> {
     const payload: ThermalTicketInput = await this.serviceOrdersService.buildPrintPayload(id, this.getAuditActor(req));
-    return this.printingService.generate80mmTicket(payload);
+    return this.printingService.generateAndDispatch80mmTicket(payload);
   }
 }
