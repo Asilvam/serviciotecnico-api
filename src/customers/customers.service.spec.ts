@@ -27,10 +27,7 @@ describe('CustomersService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CustomersService,
-        { provide: getRepositoryToken(Customer), useValue: mockCustomerRepository },
-      ],
+      providers: [CustomersService, { provide: getRepositoryToken(Customer), useValue: mockCustomerRepository }],
     }).compile();
 
     service = module.get<CustomersService>(CustomersService);
@@ -58,9 +55,7 @@ describe('CustomersService', () => {
     it('should throw ConflictException if email already exists', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
 
-      await expect(
-        service.create({ name: 'Juan', email: 'juan@example.com' }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.create({ name: 'Juan', email: 'juan@example.com' })).rejects.toThrow(ConflictException);
     });
   });
 
@@ -101,13 +96,9 @@ describe('CustomersService', () => {
         id: '67d0f4a5f99f719467f91a03',
         email: 'other@example.com',
       };
-      mockCustomerRepository.findOne
-        .mockResolvedValueOnce(mockCustomer)
-        .mockResolvedValueOnce(otherCustomer);
+      mockCustomerRepository.findOne.mockResolvedValueOnce(mockCustomer).mockResolvedValueOnce(otherCustomer);
 
-      await expect(
-        service.update('67d0f4a5f99f719467f91a02', { email: 'other@example.com' }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.update('67d0f4a5f99f719467f91a02', { email: 'other@example.com' })).rejects.toThrow(ConflictException);
     });
   });
 
@@ -117,9 +108,7 @@ describe('CustomersService', () => {
       mockCustomerRepository.save.mockResolvedValue({ ...mockCustomer, isActive: false });
 
       await service.remove('67d0f4a5f99f719467f91a02');
-      expect(mockCustomerRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ isActive: false }),
-      );
+      expect(mockCustomerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }));
     });
   });
 });

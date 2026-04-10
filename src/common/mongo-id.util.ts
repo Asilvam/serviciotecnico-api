@@ -7,4 +7,3 @@ export function toObjectId(id: string): ObjectId | null {
 
   return new ObjectId(id);
 }
-

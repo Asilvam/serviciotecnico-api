@@ -28,10 +28,7 @@ describe('ProductsService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ProductsService,
-        { provide: getRepositoryToken(Product), useValue: mockProductRepository },
-      ],
+      providers: [ProductsService, { provide: getRepositoryToken(Product), useValue: mockProductRepository }],
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
@@ -60,9 +57,7 @@ describe('ProductsService', () => {
     it('should throw ConflictException if SKU already exists', async () => {
       mockProductRepository.findOne.mockResolvedValue(mockProduct);
 
-      await expect(
-        service.create({ name: 'Product', sku: 'LCD-15-001', price: 100 }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.create({ name: 'Product', sku: 'LCD-15-001', price: 100 })).rejects.toThrow(ConflictException);
     });
   });
 

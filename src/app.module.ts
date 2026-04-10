@@ -8,6 +8,7 @@ import { CustomersModule } from './customers/customers.module';
 import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { TechniciansModule } from './technicians/technicians.module';
 import { ProductsModule } from './products/products.module';
+import { PrintingModule } from './printing/printing.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProductsModule } from './products/products.module';
     ServiceOrdersModule,
     TechniciansModule,
     ProductsModule,
+    PrintingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
