@@ -1,7 +1,8 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsMongoId } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsMongoId, IsArray, ValidateNested } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ServiceOrderStatus, ServiceOrderPriority } from '../service-order.entity';
+import { ServiceOrderItemDto } from './create-service-order.dto';
 
 export class UpdateServiceOrderDto {
   @ApiPropertyOptional({ example: '67d0f4a5f99f719467f91a33' })
@@ -39,4 +40,11 @@ export class UpdateServiceOrderDto {
   @IsOptional()
   @IsDateString()
   estimatedDelivery?: string;
+
+  @ApiPropertyOptional({ type: [ServiceOrderItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ServiceOrderItemDto)
+  items?: ServiceOrderItemDto[];
 }

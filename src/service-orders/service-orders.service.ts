@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ServiceOrder, ServiceOrderStatus } from './service-order.entity';
@@ -50,8 +50,25 @@ export class ServiceOrdersService {
     return `OT-${year}${month}${day}-${random}`;
   }
 
+  private ensureUniqueItems(items: { productId: string }[]): void {
+    const seen = new Set<string>();
+    for (const item of items) {
+      if (!item.productId) {
+        throw new BadRequestException('Cada item debe incluir productId.');
+      }
+      if (seen.has(item.productId)) {
+        throw new BadRequestException('No se permiten items duplicados.');
+      }
+      seen.add(item.productId);
+    }
+  }
+
   async create(createServiceOrderDto: CreateServiceOrderDto, actor?: AuditActor): Promise<ServiceOrder> {
     const { items, ...orderData } = createServiceOrderDto;
+
+    if (items && items.length > 0) {
+      this.ensureUniqueItems(items);
+    }
 
     const order = this.serviceOrderRepository.create({
       ...orderData,
@@ -129,6 +146,20 @@ export class ServiceOrdersService {
 
     if (updateServiceOrderDto.laborCost !== undefined) {
       order.totalCost = (updateServiceOrderDto.laborCost || 0) + order.partsCost;
+    }
+
+    if (updateServiceOrderDto.items) {
+      this.ensureUniqueItems(updateServiceOrderDto.items);
+      const partsCost = updateServiceOrderDto.items.reduce(
+        (sum, item) => sum + item.unitPrice * (item.quantity || 1),
+        0,
+      );
+      order.items = updateServiceOrderDto.items.map((item) => ({
+        ...item,
+        quantity: item.quantity || 1,
+      }));
+      order.partsCost = partsCost;
+      order.totalCost = (order.laborCost || 0) + partsCost;
     }
 
     if (updateServiceOrderDto.status === ServiceOrderStatus.DELIVERED) {
