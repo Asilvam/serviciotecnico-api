@@ -27,7 +27,13 @@ describe('CustomersService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [CustomersService, { provide: getRepositoryToken(Customer), useValue: mockCustomerRepository }],
+      providers: [
+        CustomersService,
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: mockCustomerRepository,
+        },
+      ],
     }).compile();
 
     service = module.get<CustomersService>(CustomersService);
@@ -86,7 +92,9 @@ describe('CustomersService', () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
       mockCustomerRepository.save.mockResolvedValue(updated);
 
-      const result = await service.update('67d0f4a5f99f719467f91a02', { name: 'Updated Name' });
+      const result = await service.update('67d0f4a5f99f719467f91a02', {
+        name: 'Updated Name',
+      });
       expect(result.name).toBe('Updated Name');
     });
 
@@ -98,14 +106,21 @@ describe('CustomersService', () => {
       };
       mockCustomerRepository.findOne.mockResolvedValueOnce(mockCustomer).mockResolvedValueOnce(otherCustomer);
 
-      await expect(service.update('67d0f4a5f99f719467f91a02', { email: 'other@example.com' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.update('67d0f4a5f99f719467f91a02', {
+          email: 'other@example.com',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('remove', () => {
     it('should deactivate a customer', async () => {
       mockCustomerRepository.findOne.mockResolvedValue({ ...mockCustomer });
-      mockCustomerRepository.save.mockResolvedValue({ ...mockCustomer, isActive: false });
+      mockCustomerRepository.save.mockResolvedValue({
+        ...mockCustomer,
+        isActive: false,
+      });
 
       await service.remove('67d0f4a5f99f719467f91a02');
       expect(mockCustomerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }));

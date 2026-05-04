@@ -58,7 +58,10 @@ export class CreateServiceOrderDto {
   @IsString()
   problemDescription: string;
 
-  @ApiPropertyOptional({ enum: ServiceOrderPriority, default: ServiceOrderPriority.MEDIUM })
+  @ApiPropertyOptional({
+    enum: ServiceOrderPriority,
+    default: ServiceOrderPriority.MEDIUM,
+  })
   @IsOptional()
   @IsEnum(ServiceOrderPriority)
   priority?: ServiceOrderPriority;

@@ -34,7 +34,9 @@ export class TechniciansService {
       throw new NotFoundException(`Technician #${id} not found`);
     }
 
-    const technician = await this.technicianRepository.findOne({ where: { _id: objectId } });
+    const technician = await this.technicianRepository.findOne({
+      where: { _id: objectId },
+    });
     if (!technician) {
       throw new NotFoundException(`Technician #${id} not found`);
     }

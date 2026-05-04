@@ -16,7 +16,10 @@ export class CreateTechnicianDto {
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ enum: TechnicianSpecialty, default: TechnicianSpecialty.GENERAL })
+  @ApiPropertyOptional({
+    enum: TechnicianSpecialty,
+    default: TechnicianSpecialty.GENERAL,
+  })
   @IsOptional()
   @IsEnum(TechnicianSpecialty)
   specialty?: TechnicianSpecialty;

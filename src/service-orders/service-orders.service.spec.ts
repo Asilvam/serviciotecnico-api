@@ -6,6 +6,7 @@ import { ServiceOrder, ServiceOrderStatus, ServiceOrderPriority } from './servic
 import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
 import { AuditService } from '../audit/audit.service';
+import { PrintingService } from '../printing/printing.service';
 
 const mockOrder: ServiceOrder = {
   id: '67d0f4a5f99f719467f91a07',
@@ -50,6 +51,10 @@ const mockAuditService = {
   record: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockPrintingService = {
+  generateAndDispatch80mmTicket: jest.fn(),
+};
+
 describe('ServiceOrdersService', () => {
   let service: ServiceOrdersService;
 
@@ -73,11 +78,18 @@ describe('ServiceOrdersService', () => {
           provide: AuditService,
           useValue: mockAuditService,
         },
+        {
+          provide: PrintingService,
+          useValue: mockPrintingService,
+        },
       ],
     }).compile();
 
     service = module.get<ServiceOrdersService>(ServiceOrdersService);
     jest.clearAllMocks();
+    mockOrderRepository.findOne.mockResolvedValue(mockOrder);
+    mockCustomerRepository.findOne.mockResolvedValue({ name: 'Cliente Test' });
+    mockTechnicianRepository.findOne.mockResolvedValue({ name: 'Tecnico Test' });
   });
 
   it('should be defined', () => {
@@ -98,10 +110,15 @@ describe('ServiceOrdersService', () => {
 
       expect(result).toBeDefined();
       expect(result.customerId).toBe('67d0f4a5f99f719467f91a02');
+      expect(mockPrintingService.generateAndDispatch80mmTicket).toHaveBeenCalled();
     });
 
     it('should calculate parts cost and total cost when items are provided', async () => {
-      const orderWithItems = { ...mockOrder, partsCost: 50000, totalCost: 50000 };
+      const orderWithItems = {
+        ...mockOrder,
+        partsCost: 50000,
+        totalCost: 50000,
+      };
       mockOrderRepository.create.mockReturnValue({ ...mockOrder });
       mockOrderRepository.save.mockResolvedValue(orderWithItems);
       const result = await service.create({
@@ -120,6 +137,7 @@ describe('ServiceOrdersService', () => {
       });
 
       expect(result).toBeDefined();
+      expect(mockPrintingService.generateAndDispatch80mmTicket).toHaveBeenCalled();
     });
   });
 

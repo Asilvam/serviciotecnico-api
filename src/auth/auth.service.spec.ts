@@ -1,13 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ObjectId } from 'mongodb';
 import { AuthService } from './auth.service';
 import { User, UserRole } from './user.entity';
 import * as bcrypt from 'bcryptjs';
 
 const mockUser: User = {
   id: '67d0f4a5f99f719467f91a01',
+  _id: new ObjectId('67d0f4a5f99f719467f91a01'),
   email: 'test@example.com',
   password: '$2a$10$abcdefghij',
   name: 'Test User',
@@ -19,6 +21,7 @@ const mockUser: User = {
 
 const mockUserRepository = {
   findOne: jest.fn(),
+  find: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
 };
@@ -97,6 +100,39 @@ describe('AuthService', () => {
           password: 'password123',
         }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('createUser', () => {
+    it('should create and return user without password', async () => {
+      mockUserRepository.findOne.mockResolvedValue(null);
+      mockUserRepository.create.mockImplementation((payload: User) => payload);
+      mockUserRepository.save.mockImplementation((payload: User) => payload);
+
+      const result = await service.createUser({
+        email: 'new@example.com',
+        password: 'password123',
+        name: 'New User',
+      });
+
+      expect(result).not.toHaveProperty('password');
+      expect(mockUserRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'new@example.com',
+          name: 'New User',
+          role: UserRole.RECEPTIONIST,
+          isActive: true,
+        }),
+      );
+      const createMock = mockUserRepository.create;
+      const firstCreateCall = createMock.mock.calls[0] as [User];
+      expect(firstCreateCall[0].password).not.toBe('password123');
+    });
+  });
+
+  describe('findUserById', () => {
+    it('should throw NotFoundException for invalid object id', async () => {
+      await expect(service.findUserById('invalid-id')).rejects.toThrow(NotFoundException);
     });
   });
 });

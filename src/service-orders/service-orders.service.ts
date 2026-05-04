@@ -98,7 +98,9 @@ export class ServiceOrdersService {
       throw new NotFoundException(`Service Order #${id} not found`);
     }
 
-    const order = await this.serviceOrderRepository.findOne({ where: { _id: objectId } });
+    const order = await this.serviceOrderRepository.findOne({
+      where: { _id: objectId },
+    });
     if (!order) {
       this.logger.warn(`service_order.find_one.not_found id=${id}`);
       throw new NotFoundException(`Service Order #${id} not found`);

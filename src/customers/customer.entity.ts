@@ -1,13 +1,6 @@
-import {
-  Entity,
-  ObjectIdColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, ObjectIdColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Transform } from 'class-transformer';
 import { ObjectId } from 'mongodb';
-import { IsOptional } from 'class-validator';
 
 @Entity('customers')
 export class Customer {

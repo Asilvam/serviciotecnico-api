@@ -50,6 +50,10 @@ Variables disponibles:
 |---|---|---|
 | `PORT` | Puerto HTTP de la API | `3500` |
 | `NODE_ENV` | Ambiente de ejecución | `development` |
+| `SWAGGER_PATH` | Ruta de Swagger UI | `api` |
+| `SWAGGER_TITLE` | Titulo de la documentacion | `Servicio Tecnico API` |
+| `SWAGGER_DESCRIPTION` | Descripcion visible en Swagger | `API para gestion de servicio tecnico` |
+| `SWAGGER_VERSION` | Version de la API en Swagger | `1.0` |
 | `MONGODB_URI` | URI de conexión a MongoDB Atlas | `mongodb+srv://...` |
 | `MONGODB_DB` | Nombre de la base de datos | `serviciotecnico` |
 | `JWT_SECRET` | Secreto para firmar JWT | `cambia-esto-en-produccion` |
@@ -93,7 +97,7 @@ Respuesta esperada:
 Una vez levantada la API:
 
 ```text
-http://localhost:3500/api
+http://localhost:3500/${SWAGGER_PATH:-api}
 ```
 
 ### Cómo usar Bearer token en Swagger
@@ -118,6 +122,67 @@ Endpoints:
 - `POST /auth/register`
 - `POST /auth/login`
 - `GET /auth/profile`
+
+### Users (admin)
+
+- `POST /users`
+- `GET /users`
+- `GET /users/:id`
+- `PATCH /users/:id`
+- `DELETE /users/:id`
+
+Permisos y comportamiento:
+
+- Todos los endpoints de `/users` requieren JWT (`AuthGuard('jwt')`).
+- Solo rol `admin` puede ejecutar estas rutas.
+- Las respuestas de usuarios no incluyen `password`.
+- `DELETE /users/:id` aplica borrado lógico (`isActive=false`).
+- Un usuario desactivado no puede iniciar sesión.
+
+Payload para crear usuario (`POST /users`):
+
+```json
+{
+  "email": "tech1@test.com",
+  "password": "123456",
+  "name": "Tecnico Uno",
+  "role": "technician",
+  "isActive": true
+}
+```
+
+Payload para actualizar usuario (`PATCH /users/:id`):
+
+```json
+{
+  "name": "Tecnico Uno Actualizado",
+  "role": "receptionist",
+  "isActive": true
+}
+```
+
+Ejemplos rápidos:
+
+```bash
+# Listar usuarios (admin)
+curl -X GET http://localhost:3500/users \
+  -H 'Authorization: Bearer TU_TOKEN_ADMIN'
+
+# Crear usuario (admin)
+curl -X POST http://localhost:3500/users \
+  -H 'Authorization: Bearer TU_TOKEN_ADMIN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"email": "recep1@test.com",
+	"password": "123456",
+	"name": "Recepcion Uno",
+	"role": "receptionist"
+  }'
+
+# Desactivar usuario (admin)
+curl -X DELETE http://localhost:3500/users/USER_ID \
+  -H 'Authorization: Bearer TU_TOKEN_ADMIN'
+```
 
 Roles soportados:
 

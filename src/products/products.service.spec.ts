@@ -28,7 +28,13 @@ describe('ProductsService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ProductsService, { provide: getRepositoryToken(Product), useValue: mockProductRepository }],
+      providers: [
+        ProductsService,
+        {
+          provide: getRepositoryToken(Product),
+          useValue: mockProductRepository,
+        },
+      ],
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
@@ -84,7 +90,10 @@ describe('ProductsService', () => {
 
   describe('updateStock', () => {
     it('should increase stock', async () => {
-      mockProductRepository.findOne.mockResolvedValue({ ...mockProduct, stock: 10 });
+      mockProductRepository.findOne.mockResolvedValue({
+        ...mockProduct,
+        stock: 10,
+      });
       mockProductRepository.save.mockImplementation((p) => Promise.resolve(p));
 
       const result = await service.updateStock('67d0f4a5f99f719467f91a04', 5);
@@ -92,7 +101,10 @@ describe('ProductsService', () => {
     });
 
     it('should not decrease stock below 0', async () => {
-      mockProductRepository.findOne.mockResolvedValue({ ...mockProduct, stock: 2 });
+      mockProductRepository.findOne.mockResolvedValue({
+        ...mockProduct,
+        stock: 2,
+      });
       mockProductRepository.save.mockImplementation((p) => Promise.resolve(p));
 
       const result = await service.updateStock('67d0f4a5f99f719467f91a04', -10);

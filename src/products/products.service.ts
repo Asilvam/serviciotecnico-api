@@ -34,7 +34,9 @@ export class ProductsService {
       throw new NotFoundException(`Product #${id} not found`);
     }
 
-    const product = await this.productRepository.findOne({ where: { _id: objectId } });
+    const product = await this.productRepository.findOne({
+      where: { _id: objectId },
+    });
     if (!product) {
       throw new NotFoundException(`Product #${id} not found`);
     }

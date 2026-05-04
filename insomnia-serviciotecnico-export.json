@@ -22,7 +22,8 @@
         "customer_id": "",
         "technician_id": "",
         "product_id": "",
-        "order_id": ""
+        "order_id": "",
+        "user_id": ""
       }
     },
     {
@@ -286,7 +287,7 @@
       },
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Cliente Flujo 58mm\",\n  \"email\": \"cliente.flujo58@test.com\",\n  \"phone\": \"3001234567\",\n  \"address\": \"Direccion de prueba\"\n}"
+        "text": "{\n  \"name\": \"Cliente Flujo 80mm\",\n  \"email\": \"cliente.flujo80@test.com\",\n  \"phone\": \"3001234567\",\n  \"address\": \"Direccion de prueba\"\n}"
       },
       "headers": [
         {
@@ -322,10 +323,10 @@
       "_id": "req_flow_print58",
       "_type": "request",
       "parentId": "fld_orders_printing_flow",
-      "name": "04 - Print 58mm Ticket",
-      "description": "Genera el ticket térmico. Valida content, mimeType y width=32.",
+      "name": "04 - Print 80mm Ticket",
+      "description": "Genera el ticket termico. Valida content, mimeType y width=48.",
       "method": "POST",
-      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-58mm",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-80mm",
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"
@@ -405,9 +406,9 @@
       "_id": "req_orders_print58",
       "_type": "request",
       "parentId": "fld_orders_printing",
-      "name": "Print 58mm Ticket",
+      "name": "Print 80mm Ticket",
       "method": "POST",
-      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-58mm",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-80mm",
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"
@@ -442,6 +443,92 @@
       "name": "Cancel Service Order",
       "method": "DELETE",
       "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "fld_users",
+      "_type": "request_group",
+      "parentId": "wrk_serviciotecnico",
+      "name": "06 - Users (Admin)"
+    },
+    {
+      "_id": "req_users_create",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Create User",
+      "method": "POST",
+      "url": "{{ _.base_url }}/users",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"recep1@test.com\",\n  \"password\": \"123456\",\n  \"name\": \"Recepcion Uno\",\n  \"role\": \"receptionist\",\n  \"isActive\": true\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_users_list",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "List Users",
+      "method": "GET",
+      "url": "{{ _.base_url }}/users",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_users_get",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Get User By ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/users/{{ _.user_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      }
+    },
+    {
+      "_id": "req_users_update",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Update User",
+      "method": "PATCH",
+      "url": "{{ _.base_url }}/users/{{ _.user_id }}",
+      "authentication": {
+        "type": "bearer",
+        "token": "{{ _.token }}"
+      },
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Recepcion Uno Actualizada\",\n  \"role\": \"technician\",\n  \"isActive\": true\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_users_deactivate",
+      "_type": "request",
+      "parentId": "fld_users",
+      "name": "Deactivate User",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/users/{{ _.user_id }}",
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"
