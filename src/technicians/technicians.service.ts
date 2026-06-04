@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Technician } from './technician.entity';
@@ -43,9 +47,15 @@ export class TechniciansService {
     return technician;
   }
 
-  async update(id: string, updateTechnicianDto: UpdateTechnicianDto): Promise<Technician> {
+  async update(
+    id: string,
+    updateTechnicianDto: UpdateTechnicianDto,
+  ): Promise<Technician> {
     const technician = await this.findOne(id);
-    if (updateTechnicianDto.email && updateTechnicianDto.email !== technician.email) {
+    if (
+      updateTechnicianDto.email &&
+      updateTechnicianDto.email !== technician.email
+    ) {
       const existing = await this.technicianRepository.findOne({
         where: { email: updateTechnicianDto.email },
       });

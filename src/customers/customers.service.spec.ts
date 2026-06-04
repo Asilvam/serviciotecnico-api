@@ -61,7 +61,9 @@ describe('CustomersService', () => {
     it('should throw ConflictException if email already exists', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
 
-      await expect(service.create({ name: 'Juan', email: 'juan@example.com' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.create({ name: 'Juan', email: 'juan@example.com' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -82,7 +84,9 @@ describe('CustomersService', () => {
 
     it('should throw NotFoundException if customer not found', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -104,7 +108,9 @@ describe('CustomersService', () => {
         id: '67d0f4a5f99f719467f91a03',
         email: 'other@example.com',
       };
-      mockCustomerRepository.findOne.mockResolvedValueOnce(mockCustomer).mockResolvedValueOnce(otherCustomer);
+      mockCustomerRepository.findOne
+        .mockResolvedValueOnce(mockCustomer)
+        .mockResolvedValueOnce(otherCustomer);
 
       await expect(
         service.update('67d0f4a5f99f719467f91a02', {
@@ -123,7 +129,9 @@ describe('CustomersService', () => {
       });
 
       await service.remove('67d0f4a5f99f719467f91a02');
-      expect(mockCustomerRepository.save).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }));
+      expect(mockCustomerRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: false }),
+      );
     });
   });
 });

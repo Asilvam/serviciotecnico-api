@@ -1,4 +1,15 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsPositive, IsDateString, IsArray, ValidateNested, Min, IsMongoId } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsPositive,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+  Min,
+  IsMongoId,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ServiceOrderPriority } from '../service-order.entity';

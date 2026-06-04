@@ -15,7 +15,8 @@ async function bootstrap() {
   );
 
   const swaggerTitle = process.env.SWAGGER_TITLE ?? 'Servicio Tecnico API';
-  const swaggerDescription = process.env.SWAGGER_DESCRIPTION ?? 'API para gestion de servicio tecnico';
+  const swaggerDescription =
+    process.env.SWAGGER_DESCRIPTION ?? 'API para gestion de servicio tecnico';
   const swaggerVersion = process.env.SWAGGER_VERSION ?? '1.0';
   const swaggerPath = process.env.SWAGGER_PATH ?? 'api';
 
@@ -48,6 +49,6 @@ async function bootstrap() {
 
   app.enableCors();
 
-  await app.listen(process.env.PORT ?? 3500);
+  await app.listen(process.env.PORT ?? 3500, '0.0.0.0');
 }
 void bootstrap();

@@ -21,7 +21,13 @@ export class AuditService {
     private auditLogRepository: Repository<AuditLog>,
   ) {}
 
-  async record(action: string, entity: string, entityId: string, actor?: AuditActor, metadata?: Record<string, unknown>): Promise<void> {
+  async record(
+    action: string,
+    entity: string,
+    entityId: string,
+    actor?: AuditActor,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
     try {
       const auditLog = this.auditLogRepository.create({
         action,
@@ -35,8 +41,12 @@ export class AuditService {
       await this.auditLogRepository.save(auditLog);
     } catch (error) {
       // Do not block business flow if audit persistence fails.
-      this.logger.warn(`audit.record_failed action=${action} entity=${entity} entityId=${entityId}`);
-      this.logger.debug(error instanceof Error ? error.message : 'unknown-error');
+      this.logger.warn(
+        `audit.record_failed action=${action} entity=${entity} entityId=${entityId}`,
+      );
+      this.logger.debug(
+        error instanceof Error ? error.message : 'unknown-error',
+      );
     }
   }
 
@@ -57,7 +67,9 @@ export class AuditService {
       where.userId = userId;
     }
 
-    const requestedLimit = Number.isFinite(filters.limit) ? Number(filters.limit) : 50;
+    const requestedLimit = Number.isFinite(filters.limit)
+      ? Number(filters.limit)
+      : 50;
     const limit = Math.min(Math.max(requestedLimit, 1), 200);
 
     return this.auditLogRepository.find({

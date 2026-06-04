@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { ServiceOrdersService } from './service-orders.service';
-import { ServiceOrder, ServiceOrderStatus, ServiceOrderPriority } from './service-order.entity';
+import {
+  ServiceOrder,
+  ServiceOrderStatus,
+  ServiceOrderPriority,
+} from './service-order.entity';
 import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
 import { AuditService } from '../audit/audit.service';
@@ -89,7 +93,9 @@ describe('ServiceOrdersService', () => {
     jest.clearAllMocks();
     mockOrderRepository.findOne.mockResolvedValue(mockOrder);
     mockCustomerRepository.findOne.mockResolvedValue({ name: 'Cliente Test' });
-    mockTechnicianRepository.findOne.mockResolvedValue({ name: 'Tecnico Test' });
+    mockTechnicianRepository.findOne.mockResolvedValue({
+      name: 'Tecnico Test',
+    });
   });
 
   it('should be defined', () => {
@@ -110,7 +116,9 @@ describe('ServiceOrdersService', () => {
 
       expect(result).toBeDefined();
       expect(result.customerId).toBe('67d0f4a5f99f719467f91a02');
-      expect(mockPrintingService.generateAndDispatch80mmTicket).toHaveBeenCalled();
+      expect(
+        mockPrintingService.generateAndDispatch80mmTicket,
+      ).toHaveBeenCalled();
     });
 
     it('should calculate parts cost and total cost when items are provided', async () => {
@@ -137,7 +145,9 @@ describe('ServiceOrdersService', () => {
       });
 
       expect(result).toBeDefined();
-      expect(mockPrintingService.generateAndDispatch80mmTicket).toHaveBeenCalled();
+      expect(
+        mockPrintingService.generateAndDispatch80mmTicket,
+      ).toHaveBeenCalled();
     });
   });
 
@@ -158,7 +168,9 @@ describe('ServiceOrdersService', () => {
 
     it('should throw NotFoundException if not found', async () => {
       mockOrderRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

@@ -27,7 +27,9 @@ export class PrintingService {
     };
   }
 
-  generateAndDispatch80mmTicket(payload: ThermalTicketInput): PrintTicketResult {
+  generateAndDispatch80mmTicket(
+    payload: ThermalTicketInput,
+  ): PrintTicketResult {
     const ticket = this.generate80mmTicket(payload);
     this.printGateway.sendToPrinter(ticket);
     this.logger.log(`print_ticket.dispatched orderId=${ticket.orderId}`);

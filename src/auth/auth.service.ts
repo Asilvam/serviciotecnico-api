@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -39,20 +45,28 @@ export class AuthService {
       where: { email: registerDto.email },
     });
     if (existing) {
-      this.logger.warn(`Register rejected, email already exists: ${maskedEmail}`);
+      this.logger.warn(
+        `Register rejected, email already exists: ${maskedEmail}`,
+      );
       throw new ConflictException('Email already registered');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+    // Evitamos escalada de privilegios ignorando el campo 'role' enviado por el cliente
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { role, ...userData } = registerDto;
+
     const user = this.userRepository.create({
-      ...registerDto,
+      ...userData,
       password: hashedPassword,
-      // Avoid null from payload overriding entity defaults.
-      role: registerDto.role ?? UserRole.RECEPTIONIST,
+      role: UserRole.RECEPTIONIST, // Rol base obligatorio para auto-registro
       isActive: true,
     });
     await this.userRepository.save(user);
-    this.logger.log(`Register success for ${maskedEmail} (userId=${user.id ?? 'n/a'})`);
+    this.logger.log(
+      `Register success for ${maskedEmail} (userId=${user.id ?? 'n/a'})`,
+    );
 
     return this.generateToken(user);
   }
@@ -66,17 +80,24 @@ export class AuthService {
     });
 
     if (!user || !user.isActive) {
-      this.logger.warn(`Login rejected for ${maskedEmail}: user not found or inactive`);
+      this.logger.warn(
+        `Login rejected for ${maskedEmail}: user not found or inactive`,
+      );
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
     if (!isPasswordValid) {
       this.logger.warn(`Login rejected for ${maskedEmail}: invalid password`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    this.logger.log(`Login success for ${maskedEmail} (userId=${user.id ?? 'n/a'})`);
+    this.logger.log(
+      `Login success for ${maskedEmail} (userId=${user.id ?? 'n/a'})`,
+    );
 
     return this.generateToken(user);
   }
@@ -102,7 +123,9 @@ export class AuthService {
     return this.sanitizeUser(user);
   }
 
-  async createUser(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
+  async createUser(
+    createUserDto: CreateUserDto,
+  ): Promise<Omit<User, 'password'>> {
     const existing = await this.userRepository.findOne({
       where: { email: createUserDto.email },
     });
@@ -143,7 +166,10 @@ export class AuthService {
     return this.sanitizeUser(user);
   }
 
-  async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<Omit<User, 'password'>> {
+  async updateUser(
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<Omit<User, 'password'>> {
     const objectId = toObjectId(id);
     if (!objectId) {
       throw new NotFoundException(`User #${id} not found`);

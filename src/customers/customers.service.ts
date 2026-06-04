@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Customer } from './customer.entity';
@@ -43,7 +47,10 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: string, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
+  async update(
+    id: string,
+    updateCustomerDto: UpdateCustomerDto,
+  ): Promise<Customer> {
     const customer = await this.findOne(id);
     if (updateCustomerDto.email && updateCustomerDto.email !== customer.email) {
       const existing = await this.customerRepository.findOne({

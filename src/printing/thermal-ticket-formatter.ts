@@ -95,12 +95,18 @@ export class ThermalTicketFormatter {
     }
 
     lines.push(this.separator());
-    lines.push(this.row('Mano de obra', `$${this.currency(input.laborCost ?? 0)}`));
-    lines.push(this.row('Repuestos', `$${this.currency(input.partsCost ?? 0)}`));
+    lines.push(
+      this.row('Mano de obra', `$${this.currency(input.laborCost ?? 0)}`),
+    );
+    lines.push(
+      this.row('Repuestos', `$${this.currency(input.partsCost ?? 0)}`),
+    );
     lines.push(this.row('TOTAL', `$${this.currency(input.totalCost ?? 0)}`));
 
     if (input.estimatedDelivery) {
-      lines.push(`Entrega estimada: ${this.formatDate(input.estimatedDelivery)}`);
+      lines.push(
+        `Entrega estimada: ${this.formatDate(input.estimatedDelivery)}`,
+      );
     }
     if (input.deliveredAt) {
       lines.push(`Entregado: ${this.formatDate(input.deliveredAt)}`);

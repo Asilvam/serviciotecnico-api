@@ -4,7 +4,7 @@ API REST construida con [NestJS](https://nestjs.com/) para gestionar un negocio 
 
 ## Resumen
 
-- 🔐 Autenticación JWT con registro, login y perfil.
+- 🔐 Autenticación JWT con login y perfil (registro deshabilitado públicamente por seguridad).
 - 👥 CRUD de clientes.
 - 🔧 CRUD de técnicos.
 - 📦 CRUD de productos / repuestos.
@@ -102,7 +102,7 @@ http://localhost:3500/${SWAGGER_PATH:-api}
 
 ### Cómo usar Bearer token en Swagger
 
-1. Ejecuta `POST /auth/login` o `POST /auth/register`.
+1. Ejecuta `POST /auth/login`.
 2. Copia el valor de `accessToken`.
 3. Haz clic en **Authorize** en Swagger.
 4. Pega el token en este formato:
@@ -119,7 +119,6 @@ Bearer TU_TOKEN
 
 Endpoints:
 
-- `POST /auth/register`
 - `POST /auth/login`
 - `GET /auth/profile`
 
@@ -193,35 +192,35 @@ Roles soportados:
 ### Customers
 
 - `GET /customers`
-- `POST /customers`
+- `POST /customers` (Admin únicamente)
 - `GET /customers/:id`
-- `PATCH /customers/:id`
-- `DELETE /customers/:id`
+- `PATCH /customers/:id` (Admin únicamente)
+- `DELETE /customers/:id` (Admin únicamente)
 
 ### Technicians
 
 - `GET /technicians`
-- `POST /technicians`
+- `POST /technicians` (Admin únicamente)
 - `GET /technicians/:id`
-- `PATCH /technicians/:id`
-- `DELETE /technicians/:id`
+- `PATCH /technicians/:id` (Admin únicamente)
+- `DELETE /technicians/:id` (Admin únicamente)
 
 ### Products
 
 - `GET /products`
-- `POST /products`
+- `POST /products` (Admin únicamente)
 - `GET /products/:id`
-- `PATCH /products/:id`
-- `DELETE /products/:id`
+- `PATCH /products/:id` (Admin únicamente)
+- `DELETE /products/:id` (Admin únicamente)
 
 ### Service Orders
 
 - `GET /service-orders`
-- `POST /service-orders`
+- `POST /service-orders` (Admin únicamente)
 - `GET /service-orders/:id`
-- `PATCH /service-orders/:id`
-- `DELETE /service-orders/:id`
-- `POST /service-orders/:id/print-80mm`
+- `PATCH /service-orders/:id` (Admin únicamente)
+- `DELETE /service-orders/:id` (Admin únicamente)
+- `POST /service-orders/:id/print-80mm` (Admin únicamente)
 
 ### Audit
 
@@ -231,17 +230,24 @@ Roles soportados:
 
 ## Flujo rápido de prueba
 
-### 1. Registrar usuario
+### 1. Inicializar el Primer Administrador
+Debido a políticas de seguridad estrictas, el auto-registro público está deshabilitado. Para levantar el sistema por primera vez:
+1. Conéctate a tu clúster de MongoDB Atlas (o local) usando MongoDB Compass o shell.
+2. En la base de datos `serviciotecnico`, dentro de la colección `users`, inserta el primer usuario administrador.
+3. Asegúrate de definir su campo `role` como `"admin"` y su contraseña encriptada usando `bcrypt`.
 
-```bash
-curl -X POST http://localhost:3500/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{
-	"email": "admin@test.com",
-	"password": "123456",
-	"name": "Admin Prueba"
-  }'
+Ejemplo de documento en la colección `users`:
+```json
+{
+  "email": "admin@test.com",
+  "password": "$2a$10$YourHashedBcryptPasswordHere",
+  "name": "Administrador Inicial",
+  "role": "admin",
+  "isActive": true
+}
 ```
+
+Una vez creado este primer usuario administrador, utilízalo para iniciar sesión:
 
 ### 2. Login
 

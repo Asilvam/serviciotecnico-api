@@ -1,24 +1,24 @@
-import { Controller, ForbiddenException, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '../auth/user.entity';
 import { AuditService } from './audit.service';
 import type { AuditLog } from './audit-log.entity';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 
 @ApiTags('audit')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(UserRole.ADMIN) // Sólo administradores pueden ver logs de auditoría
 @Controller('audit-logs')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
-
-  private ensureAdmin(req: Request): void {
-    const user = (req as Request & { user?: { role?: string } }).user;
-    if (user?.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Solo admin puede ver logs');
-    }
-  }
 
   @Get()
   @ApiOperation({ summary: 'List audit logs (admin only)' })
@@ -33,10 +33,7 @@ export class AuditController {
     @Query('entityId') entityId: string | undefined,
     @Query('userId') userId: string | undefined,
     @Query('limit') limit: string | undefined,
-    @Req() req: Request,
   ): Promise<AuditLog[]> {
-    this.ensureAdmin(req);
-
     return this.auditService.findLogs({
       entity,
       action,

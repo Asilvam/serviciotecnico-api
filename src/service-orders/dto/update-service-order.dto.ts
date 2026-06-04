@@ -1,7 +1,19 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsDateString, IsMongoId, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsDateString,
+  IsMongoId,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ServiceOrderStatus, ServiceOrderPriority } from '../service-order.entity';
+import {
+  ServiceOrderStatus,
+  ServiceOrderPriority,
+} from '../service-order.entity';
 import { ServiceOrderItemDto } from './create-service-order.dto';
 
 export class UpdateServiceOrderDto {

@@ -63,7 +63,9 @@ describe('ProductsService', () => {
     it('should throw ConflictException if SKU already exists', async () => {
       mockProductRepository.findOne.mockResolvedValue(mockProduct);
 
-      await expect(service.create({ name: 'Product', sku: 'LCD-15-001', price: 100 })).rejects.toThrow(ConflictException);
+      await expect(
+        service.create({ name: 'Product', sku: 'LCD-15-001', price: 100 }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -84,7 +86,9 @@ describe('ProductsService', () => {
 
     it('should throw NotFoundException if not found', async () => {
       mockProductRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

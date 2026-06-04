@@ -9,7 +9,11 @@ import { PrintingModule } from '../printing/printing.module';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ServiceOrder, Customer, Technician]), PrintingModule, AuditModule],
+  imports: [
+    TypeOrmModule.forFeature([ServiceOrder, Customer, Technician]),
+    PrintingModule,
+    AuditModule,
+  ],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],
   exports: [ServiceOrdersService],

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ServiceOrder, ServiceOrderStatus } from './service-order.entity';
@@ -27,7 +32,10 @@ export class ServiceOrdersService {
     private readonly printingService: PrintingService,
   ) {}
 
-  private async dispatchPrintTicket(orderId: string, actor?: AuditActor): Promise<void> {
+  private async dispatchPrintTicket(
+    orderId: string,
+    actor?: AuditActor,
+  ): Promise<void> {
     try {
       const payload = await this.buildPrintPayload(orderId, actor);
       const printingService: PrintingService = this.printingService;
@@ -35,7 +43,9 @@ export class ServiceOrdersService {
       this.logger.log(`service_order.print_dispatched orderId=${orderId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown_error';
-      this.logger.error(`service_order.print_dispatch_failed orderId=${orderId} reason=${message}`);
+      this.logger.error(
+        `service_order.print_dispatch_failed orderId=${orderId} reason=${message}`,
+      );
     }
   }
 
@@ -63,7 +73,10 @@ export class ServiceOrdersService {
     }
   }
 
-  async create(createServiceOrderDto: CreateServiceOrderDto, actor?: AuditActor): Promise<ServiceOrder> {
+  async create(
+    createServiceOrderDto: CreateServiceOrderDto,
+    actor?: AuditActor,
+  ): Promise<ServiceOrder> {
     const { items, ...orderData } = createServiceOrderDto;
 
     if (items && items.length > 0) {
@@ -77,7 +90,10 @@ export class ServiceOrdersService {
     });
 
     if (items && items.length > 0) {
-      const partsCost = items.reduce((sum, item) => sum + item.unitPrice * (item.quantity || 1), 0);
+      const partsCost = items.reduce(
+        (sum, item) => sum + item.unitPrice * (item.quantity || 1),
+        0,
+      );
       order.partsCost = partsCost;
       order.totalCost = partsCost + (order.laborCost || 0);
     }
@@ -88,12 +104,20 @@ export class ServiceOrdersService {
     }));
 
     const savedOrder = await this.serviceOrderRepository.save(order);
-    this.logger.log(`service_order.created orderId=${savedOrder.id ?? 'unknown'} orderNumber=${savedOrder.orderNumber}`);
-    await this.auditService.record('service_order.created', 'service_order', savedOrder.id ?? 'unknown', actor, {
-      orderNumber: savedOrder.orderNumber,
-      status: savedOrder.status,
-      customerId: savedOrder.customerId,
-    });
+    this.logger.log(
+      `service_order.created orderId=${savedOrder.id ?? 'unknown'} orderNumber=${savedOrder.orderNumber}`,
+    );
+    await this.auditService.record(
+      'service_order.created',
+      'service_order',
+      savedOrder.id ?? 'unknown',
+      actor,
+      {
+        orderNumber: savedOrder.orderNumber,
+        status: savedOrder.status,
+        customerId: savedOrder.customerId,
+      },
+    );
 
     if (savedOrder.id) {
       await this.dispatchPrintTicket(savedOrder.id, actor);
@@ -139,13 +163,18 @@ export class ServiceOrdersService {
     });
   }
 
-  async update(id: string, updateServiceOrderDto: UpdateServiceOrderDto, actor?: AuditActor): Promise<ServiceOrder> {
+  async update(
+    id: string,
+    updateServiceOrderDto: UpdateServiceOrderDto,
+    actor?: AuditActor,
+  ): Promise<ServiceOrder> {
     const order = await this.findOne(id);
     const previousStatus = order.status;
     Object.assign(order, updateServiceOrderDto);
 
     if (updateServiceOrderDto.laborCost !== undefined) {
-      order.totalCost = (updateServiceOrderDto.laborCost || 0) + order.partsCost;
+      order.totalCost =
+        (updateServiceOrderDto.laborCost || 0) + order.partsCost;
     }
 
     if (updateServiceOrderDto.items) {
@@ -167,12 +196,20 @@ export class ServiceOrdersService {
     }
 
     const savedOrder = await this.serviceOrderRepository.save(order);
-    this.logger.log(`service_order.updated orderId=${savedOrder.id ?? id} status=${previousStatus}->${savedOrder.status}`);
-    await this.auditService.record('service_order.updated', 'service_order', savedOrder.id ?? id, actor, {
-      previousStatus,
-      currentStatus: savedOrder.status,
-      fields: Object.keys(updateServiceOrderDto),
-    });
+    this.logger.log(
+      `service_order.updated orderId=${savedOrder.id ?? id} status=${previousStatus}->${savedOrder.status}`,
+    );
+    await this.auditService.record(
+      'service_order.updated',
+      'service_order',
+      savedOrder.id ?? id,
+      actor,
+      {
+        previousStatus,
+        currentStatus: savedOrder.status,
+        fields: Object.keys(updateServiceOrderDto),
+      },
+    );
 
     if (savedOrder.id) {
       await this.dispatchPrintTicket(savedOrder.id, actor);
@@ -186,13 +223,22 @@ export class ServiceOrdersService {
     order.status = ServiceOrderStatus.CANCELLED;
     const savedOrder = await this.serviceOrderRepository.save(order);
     this.logger.log(`service_order.cancelled orderId=${savedOrder.id ?? id}`);
-    await this.auditService.record('service_order.cancelled', 'service_order', savedOrder.id ?? id, actor, {
-      status: savedOrder.status,
-    });
+    await this.auditService.record(
+      'service_order.cancelled',
+      'service_order',
+      savedOrder.id ?? id,
+      actor,
+      {
+        status: savedOrder.status,
+      },
+    );
     return savedOrder;
   }
 
-  async buildPrintPayload(id: string, actor?: AuditActor): Promise<ThermalTicketInput> {
+  async buildPrintPayload(
+    id: string,
+    actor?: AuditActor,
+  ): Promise<ThermalTicketInput> {
     const order = await this.findOne(id);
 
     let customerName: string | undefined;
@@ -203,7 +249,9 @@ export class ServiceOrdersService {
       });
       customerName = customer?.name;
     } else {
-      this.logger.warn(`service_order.print_payload.customer_id_invalid orderId=${order.id ?? id}`);
+      this.logger.warn(
+        `service_order.print_payload.customer_id_invalid orderId=${order.id ?? id}`,
+      );
     }
 
     let technicianName: string | undefined;
@@ -215,15 +263,25 @@ export class ServiceOrdersService {
         });
         technicianName = technician?.name;
       } else {
-        this.logger.warn(`service_order.print_payload.technician_id_invalid orderId=${order.id ?? id}`);
+        this.logger.warn(
+          `service_order.print_payload.technician_id_invalid orderId=${order.id ?? id}`,
+        );
       }
     }
 
-    this.logger.log(`service_order.print_payload_built orderId=${order.id ?? id}`);
-    await this.auditService.record('service_order.print_payload_built', 'service_order', order.id ?? id, actor, {
-      orderNumber: order.orderNumber,
-      status: order.status,
-    });
+    this.logger.log(
+      `service_order.print_payload_built orderId=${order.id ?? id}`,
+    );
+    await this.auditService.record(
+      'service_order.print_payload_built',
+      'service_order',
+      order.id ?? id,
+      actor,
+      {
+        orderNumber: order.orderNumber,
+        status: order.status,
+      },
+    );
 
     return {
       orderId: order.id ?? id,

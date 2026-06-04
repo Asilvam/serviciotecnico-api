@@ -36,7 +36,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { _id: objectId, isActive: true },
     });
     if (!user) {
-      this.logger.warn(`JWT rejected: user not found or inactive for sub=${payload.sub}`);
+      this.logger.warn(
+        `JWT rejected: user not found or inactive for sub=${payload.sub}`,
+      );
       throw new UnauthorizedException();
     }
 

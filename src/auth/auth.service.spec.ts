@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 import { AuthService } from './auth.service';
 import { User, UserRole } from './user.entity';
@@ -35,7 +39,11 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService, { provide: getRepositoryToken(User), useValue: mockUserRepository }, { provide: JwtService, useValue: mockJwtService }],
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(User), useValue: mockUserRepository },
+        { provide: JwtService, useValue: mockJwtService },
+      ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
@@ -132,7 +140,9 @@ describe('AuthService', () => {
 
   describe('findUserById', () => {
     it('should throw NotFoundException for invalid object id', async () => {
-      await expect(service.findUserById('invalid-id')).rejects.toThrow(NotFoundException);
+      await expect(service.findUserById('invalid-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

@@ -61,7 +61,9 @@ describe('TechniciansService', () => {
     it('should throw ConflictException if email already exists', async () => {
       mockTechnicianRepository.findOne.mockResolvedValue(mockTechnician);
 
-      await expect(service.create({ name: 'Carlos', email: 'carlos@example.com' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.create({ name: 'Carlos', email: 'carlos@example.com' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -82,7 +84,9 @@ describe('TechniciansService', () => {
 
     it('should throw NotFoundException if not found', async () => {
       mockTechnicianRepository.findOne.mockResolvedValue(null);
-      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -104,7 +108,9 @@ describe('TechniciansService', () => {
         id: '67d0f4a5f99f719467f91a06',
         email: 'other@example.com',
       };
-      mockTechnicianRepository.findOne.mockResolvedValueOnce(mockTechnician).mockResolvedValueOnce(otherTechnician);
+      mockTechnicianRepository.findOne
+        .mockResolvedValueOnce(mockTechnician)
+        .mockResolvedValueOnce(otherTechnician);
 
       await expect(
         service.update('67d0f4a5f99f719467f91a05', {
