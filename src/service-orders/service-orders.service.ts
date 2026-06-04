@@ -211,9 +211,7 @@ export class ServiceOrdersService {
       },
     );
 
-    if (savedOrder.id) {
-      await this.dispatchPrintTicket(savedOrder.id, actor);
-    }
+
 
     return savedOrder;
   }

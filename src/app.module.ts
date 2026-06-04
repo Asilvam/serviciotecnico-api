@@ -20,7 +20,7 @@ import { PrintingModule } from './printing/printing.module';
         type: 'mongodb',
         url: config.get<string>('MONGODB_URI', 'mongodb://localhost:27017'),
         database: config.get<string>('MONGODB_DB', 'serviciotecnico'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        autoLoadEntities: true,
         synchronize: config.get<string>('NODE_ENV') !== 'production',
       }),
     }),
