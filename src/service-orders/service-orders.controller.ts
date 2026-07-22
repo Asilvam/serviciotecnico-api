@@ -138,6 +138,16 @@ export class ServiceOrdersController {
     return this.serviceOrdersService.cancel(id, this.getAuditActor(req));
   }
 
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Permanently delete service order (admin only)' })
+  deletePermanent(@Param('id') id: string, @Req() req: Request) {
+    return this.serviceOrdersService.deletePermanent(
+      id,
+      this.getAuditActor(req),
+    );
+  }
+
   @Post(':id/print-80mm')
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({

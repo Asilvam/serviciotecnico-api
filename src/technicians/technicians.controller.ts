@@ -7,7 +7,9 @@ import {
   Param,
   Delete,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TechniciansService } from './technicians.service';
@@ -16,6 +18,7 @@ import { UpdateTechnicianDto } from './dto/update-technician.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../auth/user.entity';
+import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 
 @ApiTags('technicians')
 @ApiBearerAuth()
@@ -23,6 +26,17 @@ import { UserRole } from '../auth/user.entity';
 @Controller('technicians')
 export class TechniciansController {
   constructor(private readonly techniciansService: TechniciansService) {}
+
+  private getAuditActor(req: Request): AuditActor | undefined {
+    const user = (
+      req as Request & {
+        user?: { id?: string; email?: string; role?: string };
+      }
+    ).user;
+    return user
+      ? { userId: user.id, email: user.email, role: user.role }
+      : undefined;
+  }
 
   @Post()
   @Roles(UserRole.ADMIN)
@@ -34,8 +48,9 @@ export class TechniciansController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
   @ApiOperation({ summary: 'Get all technicians (admin and receptionist)' })
-  findAll() {
-    return this.techniciansService.findAll();
+  findAll(@Req() req: Request) {
+    const role = (req as Request & { user?: { role?: UserRole } }).user?.role;
+    return this.techniciansService.findAll(role === UserRole.ADMIN);
   }
 
   @Get(':id')
@@ -60,5 +75,12 @@ export class TechniciansController {
   @ApiOperation({ summary: 'Deactivate technician (admin only)' })
   remove(@Param('id') id: string) {
     return this.techniciansService.remove(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Permanently delete technician (admin only)' })
+  deletePermanent(@Param('id') id: string, @Req() req: Request) {
+    return this.techniciansService.deletePermanent(id, this.getAuditActor(req));
   }
 }

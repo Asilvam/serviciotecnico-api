@@ -1,8 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { Customer } from './customer.entity';
+import { ServiceOrder } from '../service-orders/service-order.entity';
+import { AuditService } from '../audit/audit.service';
+import { UserRole } from '../auth/user.entity';
 
 const mockCustomer: Customer = {
   id: '67d0f4a5f99f719467f91a02',
@@ -20,6 +27,21 @@ const mockCustomerRepository = {
   find: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockServiceOrderRepository = {
+  count: jest.fn(),
+};
+
+const mockAuditService = {
+  record: jest.fn().mockResolvedValue(undefined),
+};
+
+const adminActor = {
+  role: UserRole.ADMIN,
+  userId: 'admin-id',
+  email: 'admin@example.com',
 };
 
 describe('CustomersService', () => {
@@ -32,6 +54,14 @@ describe('CustomersService', () => {
         {
           provide: getRepositoryToken(Customer),
           useValue: mockCustomerRepository,
+        },
+        {
+          provide: getRepositoryToken(ServiceOrder),
+          useValue: mockServiceOrderRepository,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -69,9 +99,28 @@ describe('CustomersService', () => {
 
   describe('findAll', () => {
     it('should return all active customers', async () => {
-      mockCustomerRepository.find.mockResolvedValue([mockCustomer]);
+      mockCustomerRepository.find.mockResolvedValue([
+        mockCustomer,
+        { ...mockCustomer, id: 'inactive-id', isActive: false },
+      ]);
       const result = await service.findAll();
       expect(result).toEqual([mockCustomer]);
+    });
+
+    it('should include inactive customers when requested by administration', async () => {
+      const inactiveCustomer = {
+        ...mockCustomer,
+        id: 'inactive-id',
+        isActive: false,
+      };
+      mockCustomerRepository.find.mockResolvedValue([
+        mockCustomer,
+        inactiveCustomer,
+      ]);
+
+      const result = await service.findAll(true);
+
+      expect(result).toEqual([mockCustomer, inactiveCustomer]);
     });
   });
 
@@ -118,6 +167,30 @@ describe('CustomersService', () => {
         }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should let administration reactivate a customer', async () => {
+      const inactiveCustomer = { ...mockCustomer, isActive: false };
+      mockCustomerRepository.findOne.mockResolvedValue(inactiveCustomer);
+      mockCustomerRepository.save.mockImplementation((customer) =>
+        Promise.resolve(customer),
+      );
+
+      const result = await service.update(
+        '67d0f4a5f99f719467f91a02',
+        { isActive: true },
+        true,
+      );
+
+      expect(result.isActive).toBe(true);
+    });
+
+    it('should reject status changes without administration permission', async () => {
+      mockCustomerRepository.findOne.mockResolvedValue({ ...mockCustomer });
+
+      await expect(
+        service.update('67d0f4a5f99f719467f91a02', { isActive: false }, false),
+      ).rejects.toThrow('Solo administracion puede cambiar el estado');
+    });
   });
 
   describe('remove', () => {
@@ -128,10 +201,56 @@ describe('CustomersService', () => {
         isActive: false,
       });
 
-      await service.remove('67d0f4a5f99f719467f91a02');
+      const result = await service.remove('67d0f4a5f99f719467f91a02');
       expect(mockCustomerRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ isActive: false }),
       );
+      expect(result.isActive).toBe(false);
+    });
+  });
+
+  describe('deletePermanent', () => {
+    it('should permanently delete a customer without associated orders and audit it', async () => {
+      mockCustomerRepository.findOne.mockResolvedValue({ ...mockCustomer });
+      mockServiceOrderRepository.count.mockResolvedValue(0);
+      mockCustomerRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a02', adminActor);
+
+      expect(mockCustomerRepository.delete).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'customer.deleted_permanently',
+        'customer',
+        expect.any(String),
+        adminActor,
+        expect.objectContaining({
+          name: mockCustomer.name,
+          email: mockCustomer.email,
+          associatedOrders: 0,
+        }),
+      );
+    });
+
+    it('should block permanent deletion when the customer has orders', async () => {
+      mockCustomerRepository.findOne.mockResolvedValue({ ...mockCustomer });
+      mockServiceOrderRepository.count.mockResolvedValue(2);
+
+      await expect(
+        service.deletePermanent('67d0f4a5f99f719467f91a02', adminActor),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockCustomerRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.record).not.toHaveBeenCalled();
+    });
+
+    it('should reject permanent deletion without administration permission', async () => {
+      await expect(
+        service.deletePermanent('67d0f4a5f99f719467f91a02', {
+          role: UserRole.RECEPTIONIST,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockCustomerRepository.delete).not.toHaveBeenCalled();
     });
   });
 });

@@ -42,6 +42,7 @@ const mockOrderRepository = {
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  delete: jest.fn(),
 };
 
 const mockCustomerRepository = {
@@ -138,6 +139,49 @@ describe('ServiceOrdersService', () => {
       expect(result).toBeDefined();
       expect(result.customerId).toBe('67d0f4a5f99f719467f91a02');
       expect(mockAuditService.record).toHaveBeenCalled();
+    });
+
+    it('should reject an inactive customer when creating an order', async () => {
+      mockCustomerRepository.findOne.mockResolvedValue({
+        name: 'Cliente inactivo',
+        isActive: false,
+      });
+
+      await expect(
+        service.create(
+          {
+            customerId: '67d0f4a5f99f719467f91a02',
+            deviceType: 'Laptop',
+            deviceBrand: 'HP',
+            problemDescription: 'No enciende',
+          },
+          adminActor,
+        ),
+      ).rejects.toThrow('El cliente no existe o no esta disponible.');
+
+      expect(mockOrderRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject an inactive technician when creating an order', async () => {
+      mockTechnicianRepository.findOne.mockResolvedValue({
+        name: 'Tecnico inactivo',
+        isActive: false,
+      });
+
+      await expect(
+        service.create(
+          {
+            customerId: '67d0f4a5f99f719467f91a02',
+            technicianId: '67d0f4a5f99f719467f91a03',
+            deviceType: 'Laptop',
+            deviceBrand: 'HP',
+            problemDescription: 'No enciende',
+          },
+          adminActor,
+        ),
+      ).rejects.toThrow('El tecnico no existe o no esta disponible.');
+
+      expect(mockOrderRepository.save).not.toHaveBeenCalled();
     });
 
     it('should calculate parts cost and total cost when items are provided', async () => {
@@ -287,6 +331,19 @@ describe('ServiceOrdersService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('should return the current order when it is already cancelled', async () => {
+      const order = { ...mockOrder, status: ServiceOrderStatus.CANCELLED };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+
+      const result = await service.cancel(
+        '67d0f4a5f99f719467f91a07',
+        adminActor,
+      );
+
+      expect(result.status).toBe(ServiceOrderStatus.CANCELLED);
+      expect(mockOrderRepository.save).not.toHaveBeenCalled();
+    });
+
     it('should restore item stock when an order is cancelled', async () => {
       const order = {
         ...mockOrder,
@@ -347,7 +404,149 @@ describe('ServiceOrdersService', () => {
     });
   });
 
+  describe('deletePermanent', () => {
+    it('should permanently delete any order and record an audit log', async () => {
+      const order = { ...mockOrder };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockOrderRepository.delete).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'service_order.deleted_permanently',
+        'service_order',
+        expect.any(String),
+        adminActor,
+        expect.objectContaining({
+          orderNumber: order.orderNumber,
+          status: order.status,
+          inventoryRestored: true,
+        }),
+      );
+    });
+
+    it('should reject permanent deletion by receptionist', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({ ...mockOrder });
+
+      await expect(
+        service.deletePermanent('67d0f4a5f99f719467f91a07', receptionistActor),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockOrderRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('should restore stock when permanently deleting an active order', async () => {
+      const order = {
+        ...mockOrder,
+        status: ServiceOrderStatus.IN_PROGRESS,
+        items: [
+          {
+            productId: '67d0f4a5f99f719467f91a04',
+            productName: 'Pantalla LCD',
+            unitPrice: 25000,
+            quantity: 2,
+          },
+        ],
+      };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.delete.mockResolvedValue({ affected: 1 });
+      mockProductRepository.findOne.mockResolvedValue({
+        name: 'Pantalla LCD',
+        price: 25000,
+        stock: 8,
+        type: ProductType.PART,
+        isActive: true,
+      });
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockProductRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ stock: 10 }),
+      );
+    });
+
+    it('should not restore stock when permanently deleting a delivered order', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        status: ServiceOrderStatus.DELIVERED,
+        items: [
+          {
+            productId: '67d0f4a5f99f719467f91a04',
+            productName: 'Pantalla LCD',
+            unitPrice: 25000,
+            quantity: 2,
+          },
+        ],
+      });
+      mockOrderRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockProductRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should delete an order when a referenced product no longer exists', async () => {
+      const missingProductId = '69b3c55504eff17505169560';
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        status: ServiceOrderStatus.IN_PROGRESS,
+        items: [
+          {
+            productId: missingProductId,
+            productName: 'Repuesto antiguo',
+            unitPrice: 5000,
+            quantity: 1,
+          },
+        ],
+      });
+      mockProductRepository.findOne.mockResolvedValue(null);
+      mockOrderRepository.delete.mockResolvedValue({ affected: 1 });
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockOrderRepository.delete).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'service_order.deleted_permanently',
+        'service_order',
+        expect.any(String),
+        adminActor,
+        expect.objectContaining({
+          inventoryRestored: false,
+          inventoryRestoreSkippedProductIds: [missingProductId],
+        }),
+      );
+    });
+  });
+
   describe('update permissions', () => {
+    it('should apply and audit only fields that actually changed for admin', async () => {
+      const order = { ...mockOrder };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.update(
+        '67d0f4a5f99f719467f91a07',
+        {
+          deviceBrand: order.deviceBrand,
+          problemDescription: order.problemDescription,
+          status: ServiceOrderStatus.IN_PROGRESS,
+        },
+        adminActor,
+      );
+
+      expect(result.status).toBe(ServiceOrderStatus.IN_PROGRESS);
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'service_order.updated',
+        'service_order',
+        expect.any(String),
+        adminActor,
+        expect.objectContaining({ fields: ['status'] }),
+      );
+    });
+
     it('should let reception correct intake data while pending', async () => {
       const order = { ...mockOrder };
       mockOrderRepository.findOne.mockResolvedValue(order);
@@ -362,7 +561,26 @@ describe('ServiceOrdersService', () => {
       );
 
       expect(result.deviceBrand).toBe('Dell');
-      expect(result.technicianId).toBeNull();
+      expect(result.technicianId).toBe('');
+    });
+
+    it('should reject assigning an inactive technician while updating an order', async () => {
+      const order = { ...mockOrder };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockTechnicianRepository.findOne.mockResolvedValue({
+        name: 'Tecnico inactivo',
+        isActive: false,
+      });
+
+      await expect(
+        service.update(
+          '67d0f4a5f99f719467f91a07',
+          { technicianId: '67d0f4a5f99f719467f91a03' },
+          adminActor,
+        ),
+      ).rejects.toThrow('El tecnico no existe o no esta disponible.');
+
+      expect(mockOrderRepository.save).not.toHaveBeenCalled();
     });
 
     it('should reject technical fields from reception', async () => {

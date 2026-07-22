@@ -86,14 +86,15 @@ export class ServiceOrdersService {
     allowedFields: Set<keyof UpdateServiceOrderDto>,
   ): UpdateServiceOrderDto {
     const fields = Object.keys(dto) as Array<keyof UpdateServiceOrderDto>;
-    const allowedEntries = fields
-      .filter((field) => allowedFields.has(field))
-      .map((field) => [field, dto[field]]);
     const changedAllowedFields = fields.filter(
       (field) =>
         allowedFields.has(field) &&
         !this.valuesAreEquivalent(field, order, dto),
     );
+    const allowedEntries = changedAllowedFields.map((field) => [
+      field,
+      dto[field],
+    ]);
     const forbiddenFields = fields.filter(
       (field) =>
         !allowedFields.has(field) &&
@@ -154,7 +155,11 @@ export class ServiceOrdersService {
           'Usa la accion de cancelacion para restaurar correctamente el stock.',
         );
       }
-      return dto;
+      return this.sanitizeAllowedFields(
+        order,
+        dto,
+        new Set(Object.keys(dto) as Array<keyof UpdateServiceOrderDto>),
+      );
     }
 
     if (role === UserRole.RECEPTIONIST) {
@@ -327,6 +332,48 @@ export class ServiceOrdersService {
     }
   }
 
+  private async prepareDeletionInventoryPlan(
+    items: ServiceOrderItem[],
+  ): Promise<{ plan: InventoryPlan; skippedProductIds: string[] }> {
+    const quantities = new Map<string, number>();
+    for (const item of items ?? []) {
+      if (!item.productId) {
+        continue;
+      }
+      quantities.set(
+        item.productId,
+        (quantities.get(item.productId) ?? 0) + (item.quantity || 1),
+      );
+    }
+
+    const changes: InventoryPlan['changes'] = [];
+    const skippedProductIds: string[] = [];
+    for (const [productId, quantity] of quantities) {
+      const objectId = toObjectId(productId);
+      const product = objectId
+        ? await this.productRepository.findOne({ where: { _id: objectId } })
+        : null;
+      if (!product) {
+        skippedProductIds.push(productId);
+        this.logger.warn(
+          `service_order.delete.inventory_product_missing productId=${productId}`,
+        );
+        continue;
+      }
+      if ((product.type ?? ProductType.PART) !== ProductType.PART) {
+        continue;
+      }
+      const previousStock = product.stock ?? 0;
+      product.stock = previousStock + quantity;
+      changes.push({ product, previousStock });
+    }
+
+    return {
+      plan: { items: [], changes },
+      skippedProductIds,
+    };
+  }
+
   private async attachDisplayNames(
     order: ServiceOrder,
   ): Promise<ServiceOrderView> {
@@ -376,6 +423,35 @@ export class ServiceOrdersService {
     }
   }
 
+  private async assertCustomerAvailable(customerId: string): Promise<void> {
+    const objectId = toObjectId(customerId);
+    const customer = objectId
+      ? await this.customerRepository.findOne({ where: { _id: objectId } })
+      : null;
+    if (!customer || customer.isActive === false) {
+      throw new BadRequestException(
+        'El cliente no existe o no esta disponible.',
+      );
+    }
+  }
+
+  private async assertTechnicianAvailable(
+    technicianId?: string | null,
+  ): Promise<void> {
+    if (!technicianId) {
+      return;
+    }
+    const objectId = toObjectId(technicianId);
+    const technician = objectId
+      ? await this.technicianRepository.findOne({ where: { _id: objectId } })
+      : null;
+    if (!technician || technician.isActive === false) {
+      throw new BadRequestException(
+        'El tecnico no existe o no esta disponible.',
+      );
+    }
+  }
+
   async create(
     createServiceOrderDto: CreateServiceOrderDto,
     actor?: AuditActor,
@@ -387,6 +463,9 @@ export class ServiceOrdersService {
         'Los repuestos se registran durante el trabajo tecnico.',
       );
     }
+
+    await this.assertCustomerAvailable(orderData.customerId);
+    await this.assertTechnicianAvailable(orderData.technicianId);
 
     const inventoryPlan = await this.prepareInventoryPlan([], items ?? []);
 
@@ -522,6 +601,18 @@ export class ServiceOrdersService {
     );
     const previousStatus = order.status;
     const { items, ...updateData } = permittedUpdate;
+    if (
+      permittedUpdate.customerId &&
+      permittedUpdate.customerId !== order.customerId
+    ) {
+      await this.assertCustomerAvailable(permittedUpdate.customerId);
+    }
+    if (
+      permittedUpdate.technicianId &&
+      permittedUpdate.technicianId !== order.technicianId
+    ) {
+      await this.assertTechnicianAvailable(permittedUpdate.technicianId);
+    }
     Object.assign(order, updateData);
 
     if (permittedUpdate.laborCost !== undefined) {
@@ -570,7 +661,7 @@ export class ServiceOrdersService {
         fields: Object.keys(permittedUpdate),
       },
     );
-    return this.attachDisplayNames(savedOrder);
+    return this.findOneVisible(savedOrder.id ?? id, actor);
   }
 
   async cancel(id: string, actor?: AuditActor): Promise<ServiceOrder> {
@@ -581,7 +672,7 @@ export class ServiceOrdersService {
       );
     }
     if (order.status === ServiceOrderStatus.CANCELLED) {
-      throw new BadRequestException('La orden ya esta cancelada.');
+      return this.attachDisplayNames(order);
     }
     if (order.status === ServiceOrderStatus.DELIVERED) {
       throw new BadRequestException(
@@ -611,7 +702,74 @@ export class ServiceOrdersService {
         status: savedOrder.status,
       },
     );
-    return savedOrder;
+    return this.findOneVisible(savedOrder.id ?? id, actor);
+  }
+
+  async deletePermanent(id: string, actor?: AuditActor): Promise<void> {
+    const order = await this.findOne(id);
+    if (this.getActorRole(actor) !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Solo administracion puede eliminar ordenes definitivamente.',
+      );
+    }
+
+    const shouldRestoreInventory = ![
+      ServiceOrderStatus.CANCELLED,
+      ServiceOrderStatus.DELIVERED,
+    ].includes(order.status);
+    const inventoryRestoration = shouldRestoreInventory
+      ? await this.prepareDeletionInventoryPlan(order.items ?? [])
+      : undefined;
+    const inventoryPlan = inventoryRestoration?.plan;
+
+    if (inventoryPlan) {
+      await this.saveInventoryPlan(inventoryPlan);
+    }
+
+    try {
+      await this.serviceOrderRepository.delete(order._id ?? id);
+    } catch (error) {
+      if (inventoryPlan) {
+        await this.rollbackInventoryPlan(inventoryPlan);
+      }
+      throw error;
+    }
+
+    this.logger.warn(
+      `service_order.deleted_permanently orderId=${order.id ?? id} status=${order.status}`,
+    );
+    await this.auditService.record(
+      'service_order.deleted_permanently',
+      'service_order',
+      order.id ?? id,
+      actor,
+      {
+        orderNumber: order.orderNumber,
+        status: order.status,
+        customerId: order.customerId,
+        technicianId: order.technicianId,
+        deviceType: order.deviceType,
+        deviceBrand: order.deviceBrand,
+        deviceModel: order.deviceModel,
+        serialNumber: order.serialNumber,
+        problemDescription: order.problemDescription,
+        diagnosis: order.diagnosis,
+        workDone: order.workDone,
+        priority: order.priority,
+        laborCost: order.laborCost,
+        partsCost: order.partsCost,
+        totalCost: order.totalCost,
+        items: order.items ?? [],
+        estimatedDelivery: order.estimatedDelivery,
+        deliveredAt: order.deliveredAt,
+        inventoryRestorationAttempted: shouldRestoreInventory,
+        inventoryRestored:
+          shouldRestoreInventory &&
+          (inventoryRestoration?.skippedProductIds.length ?? 0) === 0,
+        inventoryRestoreSkippedProductIds:
+          inventoryRestoration?.skippedProductIds ?? [],
+      },
+    );
   }
 
   async buildPrintPayload(
