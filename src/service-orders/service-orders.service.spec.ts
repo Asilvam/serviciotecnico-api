@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ServiceOrdersService } from './service-orders.service';
 import {
   ServiceOrder,
@@ -10,7 +10,8 @@ import {
 import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
 import { AuditService } from '../audit/audit.service';
-import { PrintingService } from '../printing/printing.service';
+import { Product, ProductType } from '../products/product.entity';
+import { UserRole } from '../auth/user.entity';
 
 const mockOrder: ServiceOrder = {
   id: '67d0f4a5f99f719467f91a07',
@@ -51,12 +52,19 @@ const mockTechnicianRepository = {
   findOne: jest.fn(),
 };
 
+const mockProductRepository = {
+  findOne: jest.fn(),
+  save: jest.fn(),
+};
+
 const mockAuditService = {
   record: jest.fn().mockResolvedValue(undefined),
 };
 
-const mockPrintingService = {
-  generateAndDispatch80mmTicket: jest.fn(),
+const adminActor = { role: UserRole.ADMIN, userId: 'admin-id' };
+const receptionistActor = {
+  role: UserRole.RECEPTIONIST,
+  userId: 'reception-id',
 };
 
 describe('ServiceOrdersService', () => {
@@ -79,12 +87,12 @@ describe('ServiceOrdersService', () => {
           useValue: mockTechnicianRepository,
         },
         {
-          provide: AuditService,
-          useValue: mockAuditService,
+          provide: getRepositoryToken(Product),
+          useValue: mockProductRepository,
         },
         {
-          provide: PrintingService,
-          useValue: mockPrintingService,
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -96,6 +104,16 @@ describe('ServiceOrdersService', () => {
     mockTechnicianRepository.findOne.mockResolvedValue({
       name: 'Tecnico Test',
     });
+    mockProductRepository.findOne.mockResolvedValue({
+      name: 'Pantalla LCD',
+      price: 25000,
+      stock: 10,
+      type: ProductType.PART,
+      isActive: true,
+    });
+    mockProductRepository.save.mockImplementation((product) =>
+      Promise.resolve(product),
+    );
   });
 
   it('should be defined', () => {
@@ -107,18 +125,19 @@ describe('ServiceOrdersService', () => {
       mockOrderRepository.create.mockReturnValue(mockOrder);
       mockOrderRepository.save.mockResolvedValue(mockOrder);
 
-      const result = await service.create({
-        customerId: '67d0f4a5f99f719467f91a02',
-        deviceType: 'Laptop',
-        deviceBrand: 'HP',
-        problemDescription: 'No enciende',
-      });
+      const result = await service.create(
+        {
+          customerId: '67d0f4a5f99f719467f91a02',
+          deviceType: 'Laptop',
+          deviceBrand: 'HP',
+          problemDescription: 'No enciende',
+        },
+        adminActor,
+      );
 
       expect(result).toBeDefined();
       expect(result.customerId).toBe('67d0f4a5f99f719467f91a02');
-      expect(
-        mockPrintingService.generateAndDispatch80mmTicket,
-      ).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalled();
     });
 
     it('should calculate parts cost and total cost when items are provided', async () => {
@@ -129,25 +148,63 @@ describe('ServiceOrdersService', () => {
       };
       mockOrderRepository.create.mockReturnValue({ ...mockOrder });
       mockOrderRepository.save.mockResolvedValue(orderWithItems);
-      const result = await service.create({
-        customerId: '67d0f4a5f99f719467f91a02',
-        deviceType: 'Laptop',
-        deviceBrand: 'HP',
-        problemDescription: 'No enciende',
-        items: [
-          {
-            productId: '67d0f4a5f99f719467f91a04',
-            productName: 'Pantalla LCD',
-            unitPrice: 25000,
-            quantity: 2,
-          },
-        ],
-      });
+      const result = await service.create(
+        {
+          customerId: '67d0f4a5f99f719467f91a02',
+          deviceType: 'Laptop',
+          deviceBrand: 'HP',
+          problemDescription: 'No enciende',
+          items: [
+            {
+              productId: '67d0f4a5f99f719467f91a04',
+              productName: 'Precio manipulado',
+              unitPrice: 1,
+              quantity: 2,
+            },
+          ],
+        },
+        adminActor,
+      );
 
       expect(result).toBeDefined();
-      expect(
-        mockPrintingService.generateAndDispatch80mmTicket,
-      ).toHaveBeenCalled();
+      expect(mockProductRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ stock: 8 }),
+      );
+    });
+
+    it('should add services without changing stock', async () => {
+      mockOrderRepository.create.mockReturnValue({ ...mockOrder });
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+      mockProductRepository.findOne.mockResolvedValue({
+        name: 'Diagnostico tecnico',
+        price: 15000,
+        stock: 0,
+        type: ProductType.SERVICE,
+        isActive: true,
+      });
+
+      const result = await service.create(
+        {
+          customerId: '67d0f4a5f99f719467f91a02',
+          deviceType: 'Notebook',
+          deviceBrand: 'Apple',
+          problemDescription: 'No enciende',
+          items: [
+            {
+              productId: '67d0f4a5f99f719467f91a04',
+              productName: 'Dato cliente ignorado',
+              unitPrice: 1,
+              quantity: 2,
+            },
+          ],
+        },
+        adminActor,
+      );
+
+      expect(result.partsCost).toBe(30000);
+      expect(mockProductRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -156,6 +213,41 @@ describe('ServiceOrdersService', () => {
       mockOrderRepository.find.mockResolvedValue([mockOrder]);
       const result = await service.findAll();
       expect(result).toEqual([mockOrder]);
+    });
+  });
+
+  describe('role visibility', () => {
+    it('should filter the list by the linked technician', async () => {
+      const technicianId = '67d0f4a5f99f719467f91a03';
+      mockOrderRepository.find.mockResolvedValue([
+        { ...mockOrder, technicianId },
+      ]);
+
+      await service.findVisible({
+        role: UserRole.TECHNICIAN,
+        userId: 'tech-user',
+        technicianId,
+      });
+
+      const [findOptions] = mockOrderRepository.find.mock.calls[0] as [
+        { where: Partial<ServiceOrder> },
+      ];
+      expect(findOptions.where.technicianId).toBe(technicianId);
+    });
+
+    it('should reject access to an order assigned to another technician', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        technicianId: '67d0f4a5f99f719467f91a03',
+      });
+
+      await expect(
+        service.findOneVisible('67d0f4a5f99f719467f91a07', {
+          role: UserRole.TECHNICIAN,
+          userId: 'tech-user',
+          technicianId: '67d0f4a5f99f719467f91a04',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -180,8 +272,138 @@ describe('ServiceOrdersService', () => {
       mockOrderRepository.findOne.mockResolvedValue(order);
       mockOrderRepository.save.mockImplementation((o) => Promise.resolve(o));
 
-      const result = await service.cancel('67d0f4a5f99f719467f91a07');
+      const result = await service.cancel(
+        '67d0f4a5f99f719467f91a07',
+        adminActor,
+      );
       expect(result.status).toBe(ServiceOrderStatus.CANCELLED);
+    });
+
+    it('should reject cancellation by receptionist', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({ ...mockOrder });
+
+      await expect(
+        service.cancel('67d0f4a5f99f719467f91a07', receptionistActor),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should restore item stock when an order is cancelled', async () => {
+      const order = {
+        ...mockOrder,
+        items: [
+          {
+            productId: '67d0f4a5f99f719467f91a04',
+            productName: 'Pantalla LCD',
+            unitPrice: 25000,
+            quantity: 2,
+          },
+        ],
+      };
+      const product = {
+        name: 'Pantalla LCD',
+        price: 25000,
+        stock: 8,
+        isActive: true,
+      };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+      mockProductRepository.findOne.mockResolvedValue(product);
+
+      await service.cancel('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockProductRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ stock: 10 }),
+      );
+    });
+
+    it('should not change stock when cancelling an order with a service', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        items: [
+          {
+            productId: '67d0f4a5f99f719467f91a04',
+            productName: 'Diagnostico tecnico',
+            unitPrice: 15000,
+            quantity: 1,
+          },
+        ],
+      });
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+      mockProductRepository.findOne.mockResolvedValue({
+        name: 'Diagnostico tecnico',
+        price: 15000,
+        stock: 0,
+        type: ProductType.SERVICE,
+        isActive: true,
+      });
+
+      await service.cancel('67d0f4a5f99f719467f91a07', adminActor);
+
+      expect(mockProductRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update permissions', () => {
+    it('should let reception correct intake data while pending', async () => {
+      const order = { ...mockOrder };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.update(
+        '67d0f4a5f99f719467f91a07',
+        { deviceBrand: 'Dell', technicianId: null },
+        receptionistActor,
+      );
+
+      expect(result.deviceBrand).toBe('Dell');
+      expect(result.technicianId).toBeNull();
+    });
+
+    it('should reject technical fields from reception', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({ ...mockOrder });
+
+      await expect(
+        service.update(
+          '67d0f4a5f99f719467f91a07',
+          { diagnosis: 'Falla en placa' },
+          receptionistActor,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should let the assigned technician advance technical work', async () => {
+      const technicianId = '67d0f4a5f99f719467f91a03';
+      const order = {
+        ...mockOrder,
+        technicianId,
+        status: ServiceOrderStatus.IN_PROGRESS,
+      };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.update(
+        '67d0f4a5f99f719467f91a07',
+        {
+          diagnosis: 'Falla en placa',
+          status: ServiceOrderStatus.COMPLETED,
+        },
+        {
+          role: UserRole.TECHNICIAN,
+          userId: 'tech-user',
+          technicianId,
+        },
+      );
+
+      expect(result.status).toBe(ServiceOrderStatus.COMPLETED);
+      expect(result.diagnosis).toBe('Falla en placa');
     });
   });
 });

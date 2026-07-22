@@ -86,7 +86,7 @@ export class ThermalTicketFormatter {
     lines.push(this.separator());
     lines.push('ITEMS');
     if (!input.items.length) {
-      lines.push('Sin repuestos');
+      lines.push('Sin items');
     } else {
       for (const item of input.items) {
         lines.push(...this.wrap(`${item.quantity} x ${item.productName}`));
@@ -98,9 +98,7 @@ export class ThermalTicketFormatter {
     lines.push(
       this.row('Mano de obra', `$${this.currency(input.laborCost ?? 0)}`),
     );
-    lines.push(
-      this.row('Repuestos', `$${this.currency(input.partsCost ?? 0)}`),
-    );
+    lines.push(this.row('Items', `$${this.currency(input.partsCost ?? 0)}`));
     lines.push(this.row('TOTAL', `$${this.currency(input.totalCost ?? 0)}`));
 
     if (input.estimatedDelivery) {

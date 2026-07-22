@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   ConflictException,
+  BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { ObjectId } from 'mongodb';
 import { AuthService } from './auth.service';
 import { User, UserRole } from './user.entity';
 import * as bcrypt from 'bcryptjs';
+import { Technician } from '../technicians/technician.entity';
 
 const mockUser: User = {
   id: '67d0f4a5f99f719467f91a01',
@@ -34,6 +36,10 @@ const mockJwtService = {
   sign: jest.fn().mockReturnValue('mock.jwt.token'),
 };
 
+const mockTechnicianRepository = {
+  findOne: jest.fn(),
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -42,6 +48,10 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
+        {
+          provide: getRepositoryToken(Technician),
+          useValue: mockTechnicianRepository,
+        },
         { provide: JwtService, useValue: mockJwtService },
       ],
     }).compile();
@@ -135,6 +145,37 @@ describe('AuthService', () => {
       const createMock = mockUserRepository.create;
       const firstCreateCall = createMock.mock.calls[0] as [User];
       expect(firstCreateCall[0].password).not.toBe('password123');
+    });
+
+    it('should require an active technician link for technician users', async () => {
+      mockUserRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createUser({
+          email: 'tech@example.com',
+          password: 'password123',
+          name: 'Tech User',
+          role: UserRole.TECHNICIAN,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should persist the technician link for technician users', async () => {
+      const technicianId = '67d0f4a5f99f719467f91a03';
+      mockUserRepository.findOne.mockResolvedValue(null);
+      mockTechnicianRepository.findOne.mockResolvedValue({ isActive: true });
+      mockUserRepository.create.mockImplementation((payload: User) => payload);
+      mockUserRepository.save.mockImplementation((payload: User) => payload);
+
+      const result = await service.createUser({
+        email: 'tech@example.com',
+        password: 'password123',
+        name: 'Tech User',
+        role: UserRole.TECHNICIAN,
+        technicianId,
+      });
+
+      expect(result.technicianId).toBe(technicianId);
     });
   });
 

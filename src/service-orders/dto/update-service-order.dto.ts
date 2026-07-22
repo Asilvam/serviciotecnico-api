@@ -17,20 +17,50 @@ import {
 import { ServiceOrderItemDto } from './create-service-order.dto';
 
 export class UpdateServiceOrderDto {
+  @ApiPropertyOptional({ example: '67d0f4a5f99f719467f91a22' })
+  @IsOptional()
+  @IsMongoId()
+  customerId?: string;
+
   @ApiPropertyOptional({ example: '67d0f4a5f99f719467f91a33' })
   @IsOptional()
   @IsMongoId()
-  technicianId?: string;
+  technicianId?: string | null;
+
+  @ApiPropertyOptional({ example: 'Notebook' })
+  @IsOptional()
+  @IsString()
+  deviceType?: string;
+
+  @ApiPropertyOptional({ example: 'Apple' })
+  @IsOptional()
+  @IsString()
+  deviceBrand?: string;
+
+  @ApiPropertyOptional({ example: 'MacBook Pro 14' })
+  @IsOptional()
+  @IsString()
+  deviceModel?: string | null;
+
+  @ApiPropertyOptional({ example: 'C02EXAMPLE' })
+  @IsOptional()
+  @IsString()
+  serialNumber?: string | null;
+
+  @ApiPropertyOptional({ example: 'No enciende' })
+  @IsOptional()
+  @IsString()
+  problemDescription?: string;
 
   @ApiPropertyOptional({ example: 'Se diagnosticó falla en placa base' })
   @IsOptional()
   @IsString()
-  diagnosis?: string;
+  diagnosis?: string | null;
 
   @ApiPropertyOptional({ example: 'Se reemplazó placa base' })
   @IsOptional()
   @IsString()
-  workDone?: string;
+  workDone?: string | null;
 
   @ApiPropertyOptional({ enum: ServiceOrderStatus })
   @IsOptional()
@@ -51,7 +81,7 @@ export class UpdateServiceOrderDto {
   @ApiPropertyOptional({ example: '2025-01-15T00:00:00.000Z' })
   @IsOptional()
   @IsDateString()
-  estimatedDelivery?: string;
+  estimatedDelivery?: string | null;
 
   @ApiPropertyOptional({ type: [ServiceOrderItemDto] })
   @IsOptional()

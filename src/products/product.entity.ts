@@ -8,6 +8,11 @@ import {
 import { Transform } from 'class-transformer';
 import { ObjectId } from 'mongodb';
 
+export enum ProductType {
+  PART = 'part',
+  SERVICE = 'service',
+}
+
 @Entity('products')
 export class Product {
   @ObjectIdColumn()
@@ -31,6 +36,9 @@ export class Product {
 
   @Column()
   price: number;
+
+  @Column({ type: 'text', default: ProductType.PART })
+  type: ProductType = ProductType.PART;
 
   @Column({ default: 0 })
   stock: number = 0;

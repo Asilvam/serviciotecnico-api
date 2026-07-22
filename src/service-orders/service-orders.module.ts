@@ -7,10 +7,11 @@ import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
 import { PrintingModule } from '../printing/printing.module';
 import { AuditModule } from '../audit/audit.module';
+import { Product } from '../products/product.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ServiceOrder, Customer, Technician]),
+    TypeOrmModule.forFeature([ServiceOrder, Customer, Technician, Product]),
     PrintingModule,
     AuditModule,
   ],

@@ -2,10 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Product } from './product.entity';
+import { Product, ProductType } from './product.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { toObjectId } from '../common/mongo-id.util';
@@ -17,6 +18,11 @@ export class ProductsService {
     private productRepository: Repository<Product>,
   ) {}
 
+  private normalizeLegacyProduct(product: Product): Product {
+    product.type ??= ProductType.PART;
+    return product;
+  }
+
   async create(createProductDto: CreateProductDto): Promise<Product> {
     const existing = await this.productRepository.findOne({
       where: { sku: createProductDto.sku },
@@ -26,12 +32,20 @@ export class ProductsService {
         `Product with SKU ${createProductDto.sku} already exists`,
       );
     }
-    const product = this.productRepository.create(createProductDto);
+    const type = createProductDto.type ?? ProductType.PART;
+    const product = this.productRepository.create({
+      ...createProductDto,
+      type,
+      stock: type === ProductType.SERVICE ? 0 : (createProductDto.stock ?? 0),
+    });
     return this.productRepository.save(product);
   }
 
   async findAll(): Promise<Product[]> {
-    return this.productRepository.find({ where: { isActive: true } });
+    const products = await this.productRepository.find({
+      where: { isActive: true },
+    });
+    return products.map((product) => this.normalizeLegacyProduct(product));
   }
 
   async findOne(id: string): Promise<Product> {
@@ -46,7 +60,7 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException(`Product #${id} not found`);
     }
-    return product;
+    return this.normalizeLegacyProduct(product);
   }
 
   async update(
@@ -55,6 +69,10 @@ export class ProductsService {
   ): Promise<Product> {
     const product = await this.findOne(id);
     Object.assign(product, updateProductDto);
+    product.type ??= ProductType.PART;
+    if (product.type === ProductType.SERVICE) {
+      product.stock = 0;
+    }
     return this.productRepository.save(product);
   }
 
@@ -66,6 +84,11 @@ export class ProductsService {
 
   async updateStock(id: string, quantity: number): Promise<Product> {
     const product = await this.findOne(id);
+    if (product.type === ProductType.SERVICE) {
+      throw new BadRequestException(
+        'Los servicios no administran existencias de inventario.',
+      );
+    }
     product.stock += quantity;
     if (product.stock < 0) {
       product.stock = 0;

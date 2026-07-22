@@ -32,13 +32,15 @@ export class CustomersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all customers' })
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Get all customers (admin and receptionist)' })
   findAll() {
     return this.customersService.findAll();
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get customer by ID' })
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @ApiOperation({ summary: 'Get customer by ID (admin and receptionist)' })
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);
   }

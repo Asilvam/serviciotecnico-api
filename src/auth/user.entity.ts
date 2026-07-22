@@ -38,6 +38,9 @@ export class User {
   @Column({ type: 'text', default: UserRole.RECEPTIONIST })
   role: UserRole = UserRole.RECEPTIONIST;
 
+  @Column({ nullable: true })
+  technicianId?: string;
+
   @Column({ default: true })
   isActive: boolean = true;
 

@@ -43,7 +43,14 @@ export class ServiceOrdersController {
 
   private getAuditActor(req: Request): AuditActor | undefined {
     const user = (
-      req as Request & { user?: { id?: string; email?: string; role?: string } }
+      req as Request & {
+        user?: {
+          id?: string;
+          email?: string;
+          role?: string;
+          technicianId?: string;
+        };
+      }
     ).user;
     if (!user) {
       return undefined;
@@ -52,6 +59,7 @@ export class ServiceOrdersController {
       userId: user.id,
       email: user.email,
       role: user.role,
+      technicianId: user.technicianId,
     };
   }
 
@@ -88,22 +96,24 @@ export class ServiceOrdersController {
   @ApiQuery({ name: 'status', enum: ServiceOrderStatus, required: false })
   @ApiQuery({ name: 'customerId', type: String, required: false })
   findAll(
+    @Req() req: Request,
     @Query('status') status?: ServiceOrderStatus,
     @Query('customerId') customerId?: string,
   ) {
-    if (status) {
-      return this.serviceOrdersService.findByStatus(status);
-    }
-    if (customerId) {
-      return this.serviceOrdersService.findByCustomer(customerId);
-    }
-    return this.serviceOrdersService.findAll();
+    return this.serviceOrdersService.findVisible(
+      this.getAuditActor(req),
+      status,
+      customerId,
+    );
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get service order by ID' })
-  findOne(@Param('id') id: string) {
-    return this.serviceOrdersService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: Request) {
+    return this.serviceOrdersService.findOneVisible(
+      id,
+      this.getAuditActor(req),
+    );
   }
 
   @Patch(':id')

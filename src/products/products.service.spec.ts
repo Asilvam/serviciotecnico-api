@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
-import { Product } from './product.entity';
+import { Product, ProductType } from './product.entity';
 
 const mockProduct: Product = {
   id: '67d0f4a5f99f719467f91a04',
@@ -10,6 +14,7 @@ const mockProduct: Product = {
   description: 'Pantalla LCD para laptops',
   sku: 'LCD-15-001',
   price: 25000,
+  type: ProductType.PART,
   stock: 10,
   isActive: true,
   createdAt: new Date(),
@@ -67,6 +72,27 @@ describe('ProductsService', () => {
         service.create({ name: 'Product', sku: 'LCD-15-001', price: 100 }),
       ).rejects.toThrow(ConflictException);
     });
+
+    it('should create services without stock', async () => {
+      mockProductRepository.findOne.mockResolvedValue(null);
+      mockProductRepository.create.mockImplementation(
+        (value: Product) => value,
+      );
+      mockProductRepository.save.mockImplementation((value: Product) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.create({
+        name: 'Diagnostico tecnico',
+        sku: 'SERV-DIAG',
+        price: 15000,
+        type: ProductType.SERVICE,
+        stock: 25,
+      });
+
+      expect(result.type).toBe(ProductType.SERVICE);
+      expect(result.stock).toBe(0);
+    });
   });
 
   describe('findAll', () => {
@@ -74,6 +100,15 @@ describe('ProductsService', () => {
       mockProductRepository.find.mockResolvedValue([mockProduct]);
       const result = await service.findAll();
       expect(result).toEqual([mockProduct]);
+    });
+
+    it('should treat legacy products without type as parts', async () => {
+      const legacyProduct = { ...mockProduct, type: undefined } as Product;
+      mockProductRepository.find.mockResolvedValue([legacyProduct]);
+
+      const result = await service.findAll();
+
+      expect(result[0].type).toBe(ProductType.PART);
     });
   });
 
@@ -89,6 +124,22 @@ describe('ProductsService', () => {
       await expect(service.findOne('67d0f4a5f99f719467f91aff')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('update', () => {
+    it('should reset stock when a product becomes a service', async () => {
+      mockProductRepository.findOne.mockResolvedValue({ ...mockProduct });
+      mockProductRepository.save.mockImplementation((value: Product) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.update('67d0f4a5f99f719467f91a04', {
+        type: ProductType.SERVICE,
+      });
+
+      expect(result.type).toBe(ProductType.SERVICE);
+      expect(result.stock).toBe(0);
     });
   });
 
@@ -113,6 +164,18 @@ describe('ProductsService', () => {
 
       const result = await service.updateStock('67d0f4a5f99f719467f91a04', -10);
       expect(result.stock).toBe(0);
+    });
+
+    it('should reject stock changes for services', async () => {
+      mockProductRepository.findOne.mockResolvedValue({
+        ...mockProduct,
+        type: ProductType.SERVICE,
+        stock: 0,
+      });
+
+      await expect(
+        service.updateStock('67d0f4a5f99f719467f91a04', 1),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

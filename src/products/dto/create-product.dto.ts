@@ -4,9 +4,11 @@ import {
   IsNumber,
   Min,
   IsPositive,
+  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { ProductType } from '../product.entity';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Pantalla LCD 15"' })
@@ -27,6 +29,11 @@ export class CreateProductDto {
   @IsNumber()
   @IsPositive()
   price: number;
+
+  @ApiPropertyOptional({ enum: ProductType, default: ProductType.PART })
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
 
   @ApiPropertyOptional({ example: 10, default: 0 })
   @IsOptional()

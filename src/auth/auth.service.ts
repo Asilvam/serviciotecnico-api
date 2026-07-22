@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { toObjectId } from '../common/mongo-id.util';
+import { Technician } from '../technicians/technician.entity';
 
 @Injectable()
 export class AuthService {
@@ -23,8 +25,38 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Technician)
+    private technicianRepository: Repository<Technician>,
     private jwtService: JwtService,
   ) {}
+
+  private async validateTechnicianAssignment(
+    role: UserRole,
+    technicianId?: string,
+  ): Promise<string | undefined> {
+    if (role !== UserRole.TECHNICIAN) {
+      return undefined;
+    }
+    if (!technicianId) {
+      throw new BadRequestException(
+        'Los usuarios tecnicos deben estar vinculados a un tecnico activo.',
+      );
+    }
+
+    const objectId = toObjectId(technicianId);
+    if (!objectId) {
+      throw new BadRequestException('El tecnico seleccionado no es valido.');
+    }
+    const technician = await this.technicianRepository.findOne({
+      where: { _id: objectId, isActive: true },
+    });
+    if (!technician) {
+      throw new BadRequestException(
+        'El tecnico seleccionado no existe o esta inactivo.',
+      );
+    }
+    return technicianId;
+  }
 
   private maskEmail(email: string): string {
     const [local, domain] = email.split('@');
@@ -134,10 +166,16 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const role = createUserDto.role ?? UserRole.RECEPTIONIST;
+    const technicianId = await this.validateTechnicianAssignment(
+      role,
+      createUserDto.technicianId,
+    );
     const user = this.userRepository.create({
       ...createUserDto,
       password: hashedPassword,
-      role: createUserDto.role ?? UserRole.RECEPTIONIST,
+      role,
+      technicianId,
       isActive: createUserDto.isActive ?? true,
     });
 
@@ -191,11 +229,18 @@ export class AuthService {
       }
     }
 
+    const nextRole = updateUserDto.role ?? user.role;
+    const nextTechnicianId = await this.validateTechnicianAssignment(
+      nextRole,
+      updateUserDto.technicianId ?? user.technicianId,
+    );
+
     if (updateUserDto.password) {
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, 10);
     }
 
     Object.assign(user, updateUserDto);
+    user.technicianId = nextTechnicianId;
     const updated = await this.userRepository.save(user);
     return this.sanitizeUser(updated);
   }
@@ -224,7 +269,12 @@ export class AuthService {
   }
 
   private generateToken(user: User): { accessToken: string } {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      technicianId: user.technicianId,
+    };
     return {
       accessToken: this.jwtService.sign(payload),
     };
