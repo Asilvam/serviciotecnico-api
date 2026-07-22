@@ -5,13 +5,13 @@ API REST construida con [NestJS](https://nestjs.com/) para gestionar un negocio 
 ## Resumen
 
 - 🔐 Autenticación JWT con login y perfil (registro deshabilitado públicamente por seguridad).
-- 👥 CRUD de clientes.
-- 🔧 CRUD de técnicos.
+- 👥 Gestión de clientes disponibles y no disponibles.
+- 🔧 Gestión de técnicos, especialidades y disponibilidad.
 - 📦 CRUD de productos / repuestos.
-- 📋 Órdenes de servicio con estados, costos y repuestos.
+- 📋 Órdenes de servicio con permisos por rol, estados, costos, repuestos y control de stock.
 - 🧾 Generación de ticket térmico de **80 mm** para órdenes.
 - 📚 Swagger en `/api`.
-- 🧾 Auditoría de acciones, visible solo para usuarios `admin`.
+- 🧾 Auditoría de acciones sensibles, visible solo para usuarios `admin`.
 - 🗄️ Persistencia en **MongoDB Atlas** usando **TypeORM**.
 
 ## Stack
@@ -192,10 +192,19 @@ Roles soportados:
 ### Customers
 
 - `GET /customers`
-- `POST /customers` (Admin únicamente)
+- `POST /customers` (Admin y Recepción)
 - `GET /customers/:id`
-- `PATCH /customers/:id` (Admin únicamente)
+- `PATCH /customers/:id` (Admin y Recepción)
 - `DELETE /customers/:id` (Admin únicamente)
+- `DELETE /customers/:id/permanent` (Admin únicamente)
+
+Comportamiento:
+
+- Admin recibe clientes activos e inactivos; Recepción solo recibe clientes disponibles.
+- Admin puede cambiar `isActive` mediante `PATCH`; Recepción puede corregir los demás datos, pero no cambiar el estado.
+- Un cliente no disponible no puede utilizarse al crear o reasignar una orden.
+- `DELETE /customers/:id` conserva el registro y establece `isActive=false`.
+- El borrado permanente solo se permite cuando el cliente no tiene órdenes asociadas y queda registrado en auditoría.
 
 ### Technicians
 
@@ -204,6 +213,15 @@ Roles soportados:
 - `GET /technicians/:id`
 - `PATCH /technicians/:id` (Admin únicamente)
 - `DELETE /technicians/:id` (Admin únicamente)
+- `DELETE /technicians/:id/permanent` (Admin únicamente)
+
+Comportamiento:
+
+- Admin recibe técnicos disponibles y no disponibles; Recepción solo recibe técnicos disponibles.
+- Admin puede cambiar `isActive` dentro de la actualización del técnico.
+- Un técnico no disponible no puede asignarse a una orden nueva ni utilizarse en una reasignación.
+- Una asignación histórica existente se conserva aunque posteriormente el técnico quede no disponible.
+- El borrado permanente solo se permite cuando el técnico no tiene órdenes asociadas y queda registrado en auditoría.
 
 ### Products
 
@@ -219,8 +237,39 @@ Roles soportados:
 - `POST /service-orders` (Admin y Recepcion)
 - `GET /service-orders/:id`
 - `PATCH /service-orders/:id` (Admin, Recepcion y Tecnico)
-- `DELETE /service-orders/:id` (Admin únicamente)
+- `DELETE /service-orders/:id` (Admin únicamente; cancela la orden)
+- `DELETE /service-orders/:id/permanent` (Admin únicamente; borrado físico)
 - `POST /service-orders/:id/print-80mm` (Admin, Recepcion y Tecnico)
+
+Estados disponibles:
+
+- `pending`
+- `in_progress`
+- `waiting_parts`
+- `completed`
+- `delivered`
+- `cancelled`
+
+Permisos operativos:
+
+- **Admin:** ve todas las órdenes, puede modificar todos los campos válidos, cancelar y eliminar físicamente.
+- **Recepción:** crea órdenes; corrige datos de ingreso mientras están pendientes; administra técnico, prioridad y fecha en estados operativos; y pasa de `completed` a `delivered`.
+- **Técnico:** solo ve sus órdenes asignadas; modifica diagnóstico, trabajo realizado y repuestos; y ejecuta transiciones técnicas válidas.
+
+Transiciones del técnico:
+
+```text
+pending -> in_progress
+in_progress -> waiting_parts | completed
+waiting_parts -> in_progress | completed
+```
+
+Reglas relevantes:
+
+- Para cancelar se debe usar `DELETE /service-orders/:id`; no se acepta asignar `cancelled` mediante `PATCH`.
+- La cancelación es idempotente y restaura el stock de los repuestos cuando corresponde.
+- El borrado físico admite cualquier estado, registra una instantánea en auditoría y restaura inventario cuando corresponde.
+- Los `PATCH` ignoran campos sin cambios y restringen los campos según el rol autenticado.
 
 ### Audit
 
@@ -411,6 +460,8 @@ curl -X GET 'http://localhost:3500/audit-logs?entity=service_order&limit=20' \
 ```
 
 > Si el usuario no es `admin`, el endpoint responde con error de permisos.
+
+Entre las acciones registradas se incluyen creación y actualización de órdenes, cancelaciones, borrado físico de órdenes y borrado físico de clientes o técnicos. Los registros conservan el actor y metadatos suficientes para reconstruir la acción sin mantener la entidad eliminada.
 
 ## Insomnia
 
