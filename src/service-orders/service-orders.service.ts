@@ -13,7 +13,6 @@ import { toObjectId } from '../common/mongo-id.util';
 import { Customer } from '../customers/customer.entity';
 import { Technician } from '../technicians/technician.entity';
 import type { ThermalTicketInput } from '../printing/thermal-ticket-formatter';
-import { PrintingService } from '../printing/printing.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 
@@ -29,25 +28,7 @@ export class ServiceOrdersService {
     @InjectRepository(Technician)
     private technicianRepository: Repository<Technician>,
     private auditService: AuditService,
-    private readonly printingService: PrintingService,
   ) {}
-
-  private async dispatchPrintTicket(
-    orderId: string,
-    actor?: AuditActor,
-  ): Promise<void> {
-    try {
-      const payload = await this.buildPrintPayload(orderId, actor);
-      const printingService: PrintingService = this.printingService;
-      printingService.generateAndDispatch80mmTicket(payload);
-      this.logger.log(`service_order.print_dispatched orderId=${orderId}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown_error';
-      this.logger.error(
-        `service_order.print_dispatch_failed orderId=${orderId} reason=${message}`,
-      );
-    }
-  }
 
   private generateOrderNumber(): string {
     const now = new Date();
@@ -118,10 +99,6 @@ export class ServiceOrdersService {
         customerId: savedOrder.customerId,
       },
     );
-
-    if (savedOrder.id) {
-      await this.dispatchPrintTicket(savedOrder.id, actor);
-    }
 
     return savedOrder;
   }

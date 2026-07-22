@@ -216,11 +216,11 @@ Roles soportados:
 ### Service Orders
 
 - `GET /service-orders`
-- `POST /service-orders` (Admin únicamente)
+- `POST /service-orders` (Admin y Recepcion)
 - `GET /service-orders/:id`
-- `PATCH /service-orders/:id` (Admin únicamente)
+- `PATCH /service-orders/:id` (Admin, Recepcion y Tecnico)
 - `DELETE /service-orders/:id` (Admin únicamente)
-- `POST /service-orders/:id/print-80mm` (Admin únicamente)
+- `POST /service-orders/:id/print-80mm` (Admin, Recepcion y Tecnico)
 
 ### Audit
 
@@ -315,7 +315,7 @@ curl -X POST http://localhost:3500/service-orders \
   }'
 ```
 
-La respuesta incluye una acción lista para imprimir:
+La respuesta incluye una acción lista para imprimir. La creación de la orden no dispara impresión automática:
 
 ```json
 {
@@ -331,7 +331,7 @@ La respuesta incluye una acción lista para imprimir:
 }
 ```
 
-### 6. Generar ticket térmico 80mm
+### 6. Generar ticket térmico 80mm (manual)
 
 ```bash
 curl -X POST http://localhost:3500/service-orders/ORDER_ID/print-80mm \
@@ -346,7 +346,7 @@ Respuesta esperada:
   "orderNumber": "OT-20260408-1234",
   "mimeType": "text/plain",
   "content": "...",
-  "width": 48,
+  "width": 40,
   "paperWidthMm": 80,
   "generatedAt": "2026-04-08T00:00:00.000Z"
 }
@@ -359,14 +359,16 @@ La API **no imprime físicamente por sí sola**. Lo que hace es generar el conte
 Características actuales del ticket:
 
 - `paperWidthMm: 80`
-- `width: 48` columnas en texto plano
+- `width: 40` columnas en texto plano
 - `mimeType: text/plain`
 
 El flujo recomendado es:
 
-1. El backend genera el ticket con `POST /service-orders/:id/print-80mm`.
-2. El frontend o un agente local recibe `content`.
-3. Ese cliente local lo envía a la impresora térmica.
+1. El frontend crea la orden con `POST /service-orders`.
+2. El frontend solicita confirmación al usuario para imprimir.
+3. Si el usuario confirma, se llama `POST /service-orders/:id/print-80mm`.
+4. El backend genera y despacha el ticket al agente/local bridge.
+5. El agente/local bridge envía `content` a la impresora térmica.
 
 ### Si imprimes desde una máquina local macOS
 
@@ -462,4 +464,3 @@ src/
 - El puerto local documentado es `3500` porque coincide con el `.env` actual.
 - Si cambias `PORT`, actualiza también tus herramientas cliente como Swagger/Insomnia.
 - La impresión actualmente está orientada a **80 mm**, no a 58 mm.
-
