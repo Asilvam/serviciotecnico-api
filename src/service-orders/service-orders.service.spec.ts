@@ -392,6 +392,16 @@ describe('ServiceOrdersService', () => {
       const result = await service.update(
         '67d0f4a5f99f719467f91a07',
         {
+          customerId: order.customerId,
+          technicianId,
+          deviceType: order.deviceType,
+          deviceBrand: order.deviceBrand,
+          deviceModel: order.deviceModel,
+          serialNumber: order.serialNumber,
+          problemDescription: order.problemDescription,
+          priority: order.priority,
+          laborCost: order.laborCost,
+          estimatedDelivery: order.estimatedDelivery.toISOString(),
           diagnosis: 'Falla en placa',
           status: ServiceOrderStatus.COMPLETED,
         },
@@ -404,6 +414,30 @@ describe('ServiceOrdersService', () => {
 
       expect(result.status).toBe(ServiceOrderStatus.COMPLETED);
       expect(result.diagnosis).toBe('Falla en placa');
+    });
+
+    it('should reject an actual intake change from a technician', async () => {
+      const technicianId = '67d0f4a5f99f719467f91a03';
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        technicianId,
+        status: ServiceOrderStatus.PENDING,
+      });
+
+      await expect(
+        service.update(
+          '67d0f4a5f99f719467f91a07',
+          {
+            deviceBrand: 'Marca no autorizada',
+            status: ServiceOrderStatus.IN_PROGRESS,
+          },
+          {
+            role: UserRole.TECHNICIAN,
+            userId: 'tech-user',
+            technicianId,
+          },
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

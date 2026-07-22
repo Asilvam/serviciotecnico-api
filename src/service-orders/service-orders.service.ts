@@ -81,17 +81,52 @@ export class ServiceOrdersService {
   }
 
   private assertAllowedFields(
+    order: ServiceOrder,
     dto: UpdateServiceOrderDto,
     allowedFields: Set<keyof UpdateServiceOrderDto>,
   ): void {
     const forbiddenFields = (
       Object.keys(dto) as Array<keyof UpdateServiceOrderDto>
-    ).filter((field) => !allowedFields.has(field));
+    ).filter(
+      (field) =>
+        !allowedFields.has(field) &&
+        !this.valuesAreEquivalent(field, order, dto),
+    );
     if (forbiddenFields.length > 0) {
       throw new ForbiddenException(
         `No tienes permisos para modificar: ${forbiddenFields.join(', ')}.`,
       );
     }
+  }
+
+  private valuesAreEquivalent(
+    field: keyof UpdateServiceOrderDto,
+    order: ServiceOrder,
+    dto: UpdateServiceOrderDto,
+  ): boolean {
+    const currentValue = order[field as keyof ServiceOrder] as unknown;
+    const requestedValue = dto[field] as unknown;
+
+    if (
+      (currentValue === null ||
+        currentValue === undefined ||
+        currentValue === '') &&
+      (requestedValue === null ||
+        requestedValue === undefined ||
+        requestedValue === '')
+    ) {
+      return true;
+    }
+    if (field === 'estimatedDelivery') {
+      const currentTime = new Date(currentValue as string | Date).getTime();
+      const requestedTime = new Date(requestedValue as string | Date).getTime();
+      return (
+        Number.isFinite(currentTime) &&
+        Number.isFinite(requestedTime) &&
+        currentTime === requestedTime
+      );
+    }
+    return JSON.stringify(currentValue) === JSON.stringify(requestedValue);
   }
 
   private validateUpdatePermissions(
@@ -140,8 +175,12 @@ export class ServiceOrdersService {
       ) {
         managementFields.add('status');
       }
-      this.assertAllowedFields(dto, managementFields);
-      if (dto.status && dto.status !== ServiceOrderStatus.DELIVERED) {
+      this.assertAllowedFields(order, dto, managementFields);
+      if (
+        dto.status &&
+        dto.status !== order.status &&
+        dto.status !== ServiceOrderStatus.DELIVERED
+      ) {
         throw new ForbiddenException(
           'Recepcion solo puede marcar como entregada una orden completada.',
         );
@@ -162,6 +201,7 @@ export class ServiceOrdersService {
       );
     }
     this.assertAllowedFields(
+      order,
       dto,
       new Set<keyof UpdateServiceOrderDto>([
         'diagnosis',
@@ -170,7 +210,7 @@ export class ServiceOrdersService {
         'status',
       ]),
     );
-    if (dto.status) {
+    if (dto.status && dto.status !== order.status) {
       const allowedTransitions: Partial<
         Record<ServiceOrderStatus, ServiceOrderStatus[]>
       > = {
