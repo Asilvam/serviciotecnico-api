@@ -50,6 +50,7 @@ Variables disponibles:
 |---|---|---|
 | `PORT` | Puerto HTTP de la API | `3500` |
 | `NODE_ENV` | Ambiente de ejecución | `development` |
+| `CORS_ORIGINS` | Lista de orígenes permitidos separados por coma | `http://localhost:5173,https://st.serviciosasm.cl` |
 | `SWAGGER_PATH` | Ruta de Swagger UI | `api` |
 | `SWAGGER_TITLE` | Titulo de la documentacion | `Servicio Tecnico API` |
 | `SWAGGER_DESCRIPTION` | Descripcion visible en Swagger | `API para gestion de servicio tecnico` |
