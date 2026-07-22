@@ -416,21 +416,46 @@ describe('ServiceOrdersService', () => {
       expect(result.diagnosis).toBe('Falla en placa');
     });
 
-    it('should reject an actual intake change from a technician', async () => {
+    it('should ignore an intake change when a valid technical change is present', async () => {
+      const technicianId = '67d0f4a5f99f719467f91a03';
+      const order = {
+        ...mockOrder,
+        technicianId,
+        status: ServiceOrderStatus.PENDING,
+      };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation((value) =>
+        Promise.resolve(value),
+      );
+
+      const result = await service.update(
+        '67d0f4a5f99f719467f91a07',
+        {
+          deviceBrand: 'Marca no autorizada',
+          status: ServiceOrderStatus.IN_PROGRESS,
+        },
+        {
+          role: UserRole.TECHNICIAN,
+          userId: 'tech-user',
+          technicianId,
+        },
+      );
+
+      expect(result.status).toBe(ServiceOrderStatus.IN_PROGRESS);
+      expect(result.deviceBrand).toBe(mockOrder.deviceBrand);
+    });
+
+    it('should reject a request containing only an intake change from a technician', async () => {
       const technicianId = '67d0f4a5f99f719467f91a03';
       mockOrderRepository.findOne.mockResolvedValue({
         ...mockOrder,
         technicianId,
-        status: ServiceOrderStatus.PENDING,
       });
 
       await expect(
         service.update(
           '67d0f4a5f99f719467f91a07',
-          {
-            deviceBrand: 'Marca no autorizada',
-            status: ServiceOrderStatus.IN_PROGRESS,
-          },
+          { deviceBrand: 'Marca no autorizada' },
           {
             role: UserRole.TECHNICIAN,
             userId: 'tech-user',

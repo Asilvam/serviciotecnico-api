@@ -80,23 +80,36 @@ export class ServiceOrdersService {
     }
   }
 
-  private assertAllowedFields(
+  private sanitizeAllowedFields(
     order: ServiceOrder,
     dto: UpdateServiceOrderDto,
     allowedFields: Set<keyof UpdateServiceOrderDto>,
-  ): void {
-    const forbiddenFields = (
-      Object.keys(dto) as Array<keyof UpdateServiceOrderDto>
-    ).filter(
+  ): UpdateServiceOrderDto {
+    const fields = Object.keys(dto) as Array<keyof UpdateServiceOrderDto>;
+    const allowedEntries = fields
+      .filter((field) => allowedFields.has(field))
+      .map((field) => [field, dto[field]]);
+    const changedAllowedFields = fields.filter(
+      (field) =>
+        allowedFields.has(field) &&
+        !this.valuesAreEquivalent(field, order, dto),
+    );
+    const forbiddenFields = fields.filter(
       (field) =>
         !allowedFields.has(field) &&
         !this.valuesAreEquivalent(field, order, dto),
     );
-    if (forbiddenFields.length > 0) {
+    if (forbiddenFields.length > 0 && changedAllowedFields.length === 0) {
       throw new ForbiddenException(
         `No tienes permisos para modificar: ${forbiddenFields.join(', ')}.`,
       );
     }
+    if (forbiddenFields.length > 0) {
+      this.logger.warn(
+        `service_order.update_fields_ignored fields=${forbiddenFields.join(',')}`,
+      );
+    }
+    return Object.fromEntries(allowedEntries) as UpdateServiceOrderDto;
   }
 
   private valuesAreEquivalent(
@@ -133,7 +146,7 @@ export class ServiceOrdersService {
     order: ServiceOrder,
     dto: UpdateServiceOrderDto,
     actor?: AuditActor,
-  ): void {
+  ): UpdateServiceOrderDto {
     const role = this.getActorRole(actor);
     if (role === UserRole.ADMIN) {
       if (dto.status === ServiceOrderStatus.CANCELLED) {
@@ -141,7 +154,7 @@ export class ServiceOrdersService {
           'Usa la accion de cancelacion para restaurar correctamente el stock.',
         );
       }
-      return;
+      return dto;
     }
 
     if (role === UserRole.RECEPTIONIST) {
@@ -175,7 +188,6 @@ export class ServiceOrdersService {
       ) {
         managementFields.add('status');
       }
-      this.assertAllowedFields(order, dto, managementFields);
       if (
         dto.status &&
         dto.status !== order.status &&
@@ -185,7 +197,7 @@ export class ServiceOrdersService {
           'Recepcion solo puede marcar como entregada una orden completada.',
         );
       }
-      return;
+      return this.sanitizeAllowedFields(order, dto, managementFields);
     }
 
     this.assertTechnicianCanAccess(order, actor);
@@ -200,16 +212,12 @@ export class ServiceOrdersService {
         'La orden ya no admite modificaciones tecnicas.',
       );
     }
-    this.assertAllowedFields(
-      order,
-      dto,
-      new Set<keyof UpdateServiceOrderDto>([
-        'diagnosis',
-        'workDone',
-        'items',
-        'status',
-      ]),
-    );
+    const allowedFields = new Set<keyof UpdateServiceOrderDto>([
+      'diagnosis',
+      'workDone',
+      'items',
+      'status',
+    ]);
     if (dto.status && dto.status !== order.status) {
       const allowedTransitions: Partial<
         Record<ServiceOrderStatus, ServiceOrderStatus[]>
@@ -230,6 +238,7 @@ export class ServiceOrdersService {
         );
       }
     }
+    return this.sanitizeAllowedFields(order, dto, allowedFields);
   }
 
   private async prepareInventoryPlan(
@@ -506,14 +515,17 @@ export class ServiceOrdersService {
     actor?: AuditActor,
   ): Promise<ServiceOrder> {
     const order = await this.findOne(id);
-    this.validateUpdatePermissions(order, updateServiceOrderDto, actor);
+    const permittedUpdate = this.validateUpdatePermissions(
+      order,
+      updateServiceOrderDto,
+      actor,
+    );
     const previousStatus = order.status;
-    const { items, ...updateData } = updateServiceOrderDto;
+    const { items, ...updateData } = permittedUpdate;
     Object.assign(order, updateData);
 
-    if (updateServiceOrderDto.laborCost !== undefined) {
-      order.totalCost =
-        (updateServiceOrderDto.laborCost || 0) + order.partsCost;
+    if (permittedUpdate.laborCost !== undefined) {
+      order.totalCost = (permittedUpdate.laborCost || 0) + order.partsCost;
     }
 
     let inventoryPlan: InventoryPlan | undefined;
@@ -528,7 +540,7 @@ export class ServiceOrdersService {
       order.totalCost = (order.laborCost || 0) + partsCost;
     }
 
-    if (updateServiceOrderDto.status === ServiceOrderStatus.DELIVERED) {
+    if (permittedUpdate.status === ServiceOrderStatus.DELIVERED) {
       order.deliveredAt = new Date();
     }
 
@@ -555,7 +567,7 @@ export class ServiceOrdersService {
       {
         previousStatus,
         currentStatus: savedOrder.status,
-        fields: Object.keys(updateServiceOrderDto),
+        fields: Object.keys(permittedUpdate),
       },
     );
     return this.attachDisplayNames(savedOrder);
