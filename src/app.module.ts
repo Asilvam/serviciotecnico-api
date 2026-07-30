@@ -9,10 +9,15 @@ import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { TechniciansModule } from './technicians/technicians.module';
 import { ProductsModule } from './products/products.module';
 import { PrintingModule } from './printing/printing.module';
+import { validateEnvironment } from './config/environment.config';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      validate: validateEnvironment,
+    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 export interface ThermalTicketInput {
   orderId: string;
   orderNumber: string;
+  trackingToken: string;
   createdAt?: Date;
   status: string;
   priority: string;

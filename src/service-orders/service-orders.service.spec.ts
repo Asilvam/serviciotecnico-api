@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  GoneException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ServiceOrdersService } from './service-orders.service';
 import {
   ServiceOrder,
@@ -12,6 +16,8 @@ import { Technician } from '../technicians/technician.entity';
 import { AuditService } from '../audit/audit.service';
 import { Product, ProductType } from '../products/product.entity';
 import { UserRole } from '../auth/user.entity';
+import { createTrackingToken } from './tracking-token.util';
+import { ConfigService } from '@nestjs/config';
 
 const mockOrder: ServiceOrder = {
   id: '67d0f4a5f99f719467f91a07',
@@ -62,6 +68,12 @@ const mockAuditService = {
   record: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockConfigService = {
+  getOrThrow: jest.fn((key: string) =>
+    key === 'TRACKING_RETENTION_DAYS' ? 30 : 'test-tracking-secret',
+  ),
+};
+
 const adminActor = { role: UserRole.ADMIN, userId: 'admin-id' };
 const receptionistActor = {
   role: UserRole.RECEPTIONIST,
@@ -94,6 +106,10 @@ describe('ServiceOrdersService', () => {
         {
           provide: AuditService,
           useValue: mockAuditService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
@@ -681,6 +697,95 @@ describe('ServiceOrdersService', () => {
           },
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('public tracking', () => {
+    beforeAll(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-07-30T12:00:00.000Z'));
+    });
+
+    afterAll(() => {
+      jest.useRealTimers();
+    });
+
+    it('returns only the public order fields for a signed token', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        updatedAt: new Date('2026-07-30T12:00:00.000Z'),
+      });
+
+      const result = await service.findPublicTracking(
+        createTrackingToken('67d0f4a5f99f719467f91a07', 'test-tracking-secret'),
+      );
+
+      expect(result).toEqual({
+        orderNumber: mockOrder.orderNumber,
+        device: {
+          type: mockOrder.deviceType,
+          brand: mockOrder.deviceBrand,
+          model: mockOrder.deviceModel,
+        },
+        status: mockOrder.status,
+        statusLabelEs: 'Pendiente',
+        estimatedDelivery: mockOrder.estimatedDelivery,
+        updatedAt: new Date('2026-07-30T12:00:00.000Z'),
+      });
+      expect(result).not.toHaveProperty('customerId');
+      expect(result).not.toHaveProperty('problemDescription');
+    });
+
+    it('returns the expiration date for a recently delivered order', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        status: ServiceOrderStatus.DELIVERED,
+        deliveredAt: new Date('2026-07-15T12:00:00.000Z'),
+        updatedAt: new Date('2026-07-15T12:00:00.000Z'),
+      });
+
+      const result = await service.findPublicTracking(
+        createTrackingToken('67d0f4a5f99f719467f91a07', 'test-tracking-secret'),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          status: ServiceOrderStatus.DELIVERED,
+          trackingExpiresAt: new Date('2026-08-14T12:00:00.000Z'),
+        }),
+      );
+    });
+
+    it('returns 410 when a cancelled order exceeds its retention period', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        status: ServiceOrderStatus.CANCELLED,
+        updatedAt: new Date('2026-06-01T12:00:00.000Z'),
+      });
+
+      await expect(
+        service.findPublicTracking(
+          createTrackingToken(
+            '67d0f4a5f99f719467f91a07',
+            'test-tracking-secret',
+          ),
+        ),
+      ).rejects.toThrow(GoneException);
+    });
+
+    it('does not expire a completed order before delivery', async () => {
+      mockOrderRepository.findOne.mockResolvedValue({
+        ...mockOrder,
+        status: ServiceOrderStatus.COMPLETED,
+        updatedAt: new Date('2025-01-01T12:00:00.000Z'),
+      });
+
+      const result = await service.findPublicTracking(
+        createTrackingToken('67d0f4a5f99f719467f91a07', 'test-tracking-secret'),
+      );
+
+      expect(result.status).toBe(ServiceOrderStatus.COMPLETED);
+      expect(result).not.toHaveProperty('trackingExpiresAt');
     });
   });
 });
