@@ -1,8 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { TechniciansService } from './technicians.service';
 import { Technician, TechnicianSpecialty } from './technician.entity';
+import { ServiceOrder } from '../service-orders/service-order.entity';
+import { AuditService } from '../audit/audit.service';
+import { UserRole } from '../auth/user.entity';
 
 const mockTechnician: Technician = {
   id: '67d0f4a5f99f719467f91a05',
@@ -20,6 +27,21 @@ const mockTechnicianRepository = {
   find: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  delete: jest.fn(),
+};
+
+const mockServiceOrderRepository = {
+  count: jest.fn(),
+};
+
+const mockAuditService = {
+  record: jest.fn(),
+};
+
+const adminActor = {
+  userId: 'admin-id',
+  email: 'admin@example.com',
+  role: UserRole.ADMIN,
 };
 
 describe('TechniciansService', () => {
@@ -32,6 +54,14 @@ describe('TechniciansService', () => {
         {
           provide: getRepositoryToken(Technician),
           useValue: mockTechnicianRepository,
+        },
+        {
+          provide: getRepositoryToken(ServiceOrder),
+          useValue: mockServiceOrderRepository,
+        },
+        {
+          provide: AuditService,
+          useValue: mockAuditService,
         },
       ],
     }).compile();
@@ -68,10 +98,26 @@ describe('TechniciansService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all active technicians', async () => {
-      mockTechnicianRepository.find.mockResolvedValue([mockTechnician]);
+    it('should return only active technicians by default', async () => {
+      const inactive = { ...mockTechnician, id: 'inactive', isActive: false };
+      mockTechnicianRepository.find.mockResolvedValue([
+        mockTechnician,
+        inactive,
+      ]);
       const result = await service.findAll();
       expect(result).toEqual([mockTechnician]);
+    });
+
+    it('should include inactive technicians for administrators', async () => {
+      const inactive = { ...mockTechnician, id: 'inactive', isActive: false };
+      mockTechnicianRepository.find.mockResolvedValue([
+        mockTechnician,
+        inactive,
+      ]);
+
+      const result = await service.findAll(true);
+
+      expect(result).toEqual([mockTechnician, inactive]);
     });
   });
 
@@ -102,6 +148,22 @@ describe('TechniciansService', () => {
       expect(result.name).toBe('Updated Name');
     });
 
+    it('should update the technician status', async () => {
+      const current = { ...mockTechnician, isActive: true };
+      const updated = { ...current, isActive: false };
+      mockTechnicianRepository.findOne.mockResolvedValue(current);
+      mockTechnicianRepository.save.mockResolvedValue(updated);
+
+      const result = await service.update('67d0f4a5f99f719467f91a05', {
+        isActive: false,
+      });
+
+      expect(result.isActive).toBe(false);
+      expect(mockTechnicianRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ isActive: false }),
+      );
+    });
+
     it('should throw ConflictException if updated email already exists', async () => {
       const otherTechnician = {
         ...mockTechnician,
@@ -117,6 +179,49 @@ describe('TechniciansService', () => {
           email: 'other@example.com',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('deletePermanent', () => {
+    it('should permanently delete a technician without associated orders and audit it', async () => {
+      mockTechnicianRepository.findOne.mockResolvedValue(mockTechnician);
+      mockServiceOrderRepository.count.mockResolvedValue(0);
+      mockTechnicianRepository.delete.mockResolvedValue({ affected: 1 });
+      mockAuditService.record.mockResolvedValue(undefined);
+
+      await service.deletePermanent('67d0f4a5f99f719467f91a05', adminActor);
+
+      expect(mockTechnicianRepository.delete).toHaveBeenCalled();
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'technician.deleted_permanently',
+        'technician',
+        '67d0f4a5f99f719467f91a05',
+        adminActor,
+        expect.objectContaining({ associatedOrders: 0 }),
+      );
+    });
+
+    it('should reject permanent deletion when the technician has associated orders', async () => {
+      mockTechnicianRepository.findOne.mockResolvedValue(mockTechnician);
+      mockServiceOrderRepository.count.mockResolvedValue(2);
+
+      await expect(
+        service.deletePermanent('67d0f4a5f99f719467f91a05', adminActor),
+      ).rejects.toThrow(ConflictException);
+
+      expect(mockTechnicianRepository.delete).not.toHaveBeenCalled();
+      expect(mockAuditService.record).not.toHaveBeenCalled();
+    });
+
+    it('should reject permanent deletion for non-admin actors', async () => {
+      await expect(
+        service.deletePermanent('67d0f4a5f99f719467f91a05', {
+          ...adminActor,
+          role: UserRole.RECEPTIONIST,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockTechnicianRepository.findOne).not.toHaveBeenCalled();
     });
   });
 });

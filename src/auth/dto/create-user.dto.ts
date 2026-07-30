@@ -4,6 +4,7 @@ import {
   IsEmail,
   IsEnum,
   IsOptional,
+  IsMongoId,
   IsString,
   MinLength,
 } from 'class-validator';
@@ -27,6 +28,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+
+  @ApiPropertyOptional({
+    description: 'Required when role is technician',
+    example: '67d0f4a5f99f719467f91a33',
+  })
+  @IsOptional()
+  @IsMongoId()
+  technicianId?: string;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

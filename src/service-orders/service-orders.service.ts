@@ -1,13 +1,21 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ServiceOrder, ServiceOrderStatus } from './service-order.entity';
-import { CreateServiceOrderDto } from './dto/create-service-order.dto';
+import {
+  ServiceOrder,
+  ServiceOrderItem,
+  ServiceOrderStatus,
+} from './service-order.entity';
+import {
+  CreateServiceOrderDto,
+  ServiceOrderItemDto,
+} from './dto/create-service-order.dto';
 import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 import { toObjectId } from '../common/mongo-id.util';
 import { Customer } from '../customers/customer.entity';
@@ -15,6 +23,18 @@ import { Technician } from '../technicians/technician.entity';
 import type { ThermalTicketInput } from '../printing/thermal-ticket-formatter';
 import { AuditService } from '../audit/audit.service';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
+import { Product, ProductType } from '../products/product.entity';
+import { UserRole } from '../auth/user.entity';
+
+type InventoryPlan = {
+  items: ServiceOrderItem[];
+  changes: Array<{ product: Product; previousStock: number }>;
+};
+
+export type ServiceOrderView = ServiceOrder & {
+  customerName?: string;
+  technicianName?: string;
+};
 
 @Injectable()
 export class ServiceOrdersService {
@@ -27,8 +47,357 @@ export class ServiceOrdersService {
     private customerRepository: Repository<Customer>,
     @InjectRepository(Technician)
     private technicianRepository: Repository<Technician>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
     private auditService: AuditService,
   ) {}
+
+  private getActorRole(actor?: AuditActor): UserRole {
+    if (
+      !actor?.role ||
+      !Object.values(UserRole).includes(actor.role as UserRole)
+    ) {
+      throw new ForbiddenException(
+        'No fue posible validar el rol del usuario.',
+      );
+    }
+    return actor.role as UserRole;
+  }
+
+  private assertTechnicianCanAccess(
+    order: ServiceOrder,
+    actor?: AuditActor,
+  ): void {
+    if (!actor?.technicianId) {
+      throw new ForbiddenException(
+        'El usuario tecnico no esta vinculado a un perfil tecnico.',
+      );
+    }
+    if (order.technicianId !== actor.technicianId) {
+      throw new ForbiddenException(
+        'Solo puedes acceder a ordenes que tienes asignadas.',
+      );
+    }
+  }
+
+  private sanitizeAllowedFields(
+    order: ServiceOrder,
+    dto: UpdateServiceOrderDto,
+    allowedFields: Set<keyof UpdateServiceOrderDto>,
+  ): UpdateServiceOrderDto {
+    const fields = Object.keys(dto) as Array<keyof UpdateServiceOrderDto>;
+    const changedAllowedFields = fields.filter(
+      (field) =>
+        allowedFields.has(field) &&
+        !this.valuesAreEquivalent(field, order, dto),
+    );
+    const allowedEntries = changedAllowedFields.map((field) => [
+      field,
+      dto[field],
+    ]);
+    const forbiddenFields = fields.filter(
+      (field) =>
+        !allowedFields.has(field) &&
+        !this.valuesAreEquivalent(field, order, dto),
+    );
+    if (forbiddenFields.length > 0 && changedAllowedFields.length === 0) {
+      throw new ForbiddenException(
+        `No tienes permisos para modificar: ${forbiddenFields.join(', ')}.`,
+      );
+    }
+    if (forbiddenFields.length > 0) {
+      this.logger.warn(
+        `service_order.update_fields_ignored fields=${forbiddenFields.join(',')}`,
+      );
+    }
+    return Object.fromEntries(allowedEntries) as UpdateServiceOrderDto;
+  }
+
+  private valuesAreEquivalent(
+    field: keyof UpdateServiceOrderDto,
+    order: ServiceOrder,
+    dto: UpdateServiceOrderDto,
+  ): boolean {
+    const currentValue = order[field as keyof ServiceOrder] as unknown;
+    const requestedValue = dto[field] as unknown;
+
+    if (
+      (currentValue === null ||
+        currentValue === undefined ||
+        currentValue === '') &&
+      (requestedValue === null ||
+        requestedValue === undefined ||
+        requestedValue === '')
+    ) {
+      return true;
+    }
+    if (field === 'estimatedDelivery') {
+      const currentTime = new Date(currentValue as string | Date).getTime();
+      const requestedTime = new Date(requestedValue as string | Date).getTime();
+      return (
+        Number.isFinite(currentTime) &&
+        Number.isFinite(requestedTime) &&
+        currentTime === requestedTime
+      );
+    }
+    return JSON.stringify(currentValue) === JSON.stringify(requestedValue);
+  }
+
+  private validateUpdatePermissions(
+    order: ServiceOrder,
+    dto: UpdateServiceOrderDto,
+    actor?: AuditActor,
+  ): UpdateServiceOrderDto {
+    const role = this.getActorRole(actor);
+    if (role === UserRole.ADMIN) {
+      if (dto.status === ServiceOrderStatus.CANCELLED) {
+        throw new BadRequestException(
+          'Usa la accion de cancelacion para restaurar correctamente el stock.',
+        );
+      }
+      return this.sanitizeAllowedFields(
+        order,
+        dto,
+        new Set(Object.keys(dto) as Array<keyof UpdateServiceOrderDto>),
+      );
+    }
+
+    if (role === UserRole.RECEPTIONIST) {
+      const managementFields = new Set<keyof UpdateServiceOrderDto>();
+      if (
+        [
+          ServiceOrderStatus.PENDING,
+          ServiceOrderStatus.IN_PROGRESS,
+          ServiceOrderStatus.WAITING_PARTS,
+        ].includes(order.status)
+      ) {
+        managementFields.add('technicianId');
+        managementFields.add('priority');
+        managementFields.add('estimatedDelivery');
+      }
+      if (order.status === ServiceOrderStatus.PENDING) {
+        [
+          'customerId',
+          'deviceType',
+          'deviceBrand',
+          'deviceModel',
+          'serialNumber',
+          'problemDescription',
+        ].forEach((field) =>
+          managementFields.add(field as keyof UpdateServiceOrderDto),
+        );
+      }
+      if (
+        order.status === ServiceOrderStatus.COMPLETED &&
+        dto.status === ServiceOrderStatus.DELIVERED
+      ) {
+        managementFields.add('status');
+      }
+      if (
+        dto.status &&
+        dto.status !== order.status &&
+        dto.status !== ServiceOrderStatus.DELIVERED
+      ) {
+        throw new ForbiddenException(
+          'Recepcion solo puede marcar como entregada una orden completada.',
+        );
+      }
+      return this.sanitizeAllowedFields(order, dto, managementFields);
+    }
+
+    this.assertTechnicianCanAccess(order, actor);
+    if (
+      [
+        ServiceOrderStatus.COMPLETED,
+        ServiceOrderStatus.DELIVERED,
+        ServiceOrderStatus.CANCELLED,
+      ].includes(order.status)
+    ) {
+      throw new ForbiddenException(
+        'La orden ya no admite modificaciones tecnicas.',
+      );
+    }
+    const allowedFields = new Set<keyof UpdateServiceOrderDto>([
+      'diagnosis',
+      'workDone',
+      'items',
+      'status',
+    ]);
+    if (dto.status && dto.status !== order.status) {
+      const allowedTransitions: Partial<
+        Record<ServiceOrderStatus, ServiceOrderStatus[]>
+      > = {
+        [ServiceOrderStatus.PENDING]: [ServiceOrderStatus.IN_PROGRESS],
+        [ServiceOrderStatus.IN_PROGRESS]: [
+          ServiceOrderStatus.WAITING_PARTS,
+          ServiceOrderStatus.COMPLETED,
+        ],
+        [ServiceOrderStatus.WAITING_PARTS]: [
+          ServiceOrderStatus.IN_PROGRESS,
+          ServiceOrderStatus.COMPLETED,
+        ],
+      };
+      if (!(allowedTransitions[order.status] ?? []).includes(dto.status)) {
+        throw new ForbiddenException(
+          `No puedes cambiar la orden de ${order.status} a ${dto.status}.`,
+        );
+      }
+    }
+    return this.sanitizeAllowedFields(order, dto, allowedFields);
+  }
+
+  private async prepareInventoryPlan(
+    currentItems: ServiceOrderItem[],
+    requestedItems: ServiceOrderItemDto[],
+  ): Promise<InventoryPlan> {
+    this.ensureUniqueItems(requestedItems);
+    const currentQuantities = new Map(
+      (currentItems ?? []).map((item) => [item.productId, item.quantity || 1]),
+    );
+    const requestedQuantities = new Map(
+      requestedItems.map((item) => [item.productId, item.quantity || 1]),
+    );
+    const productIds = new Set([
+      ...currentQuantities.keys(),
+      ...requestedQuantities.keys(),
+    ]);
+    const products = new Map<string, Product>();
+    const changes: InventoryPlan['changes'] = [];
+
+    for (const productId of productIds) {
+      const objectId = toObjectId(productId);
+      if (!objectId) {
+        throw new BadRequestException(`Producto ${productId} no valido.`);
+      }
+      const product = await this.productRepository.findOne({
+        where: { _id: objectId },
+      });
+      if (
+        !product ||
+        (!product.isActive && requestedQuantities.has(productId))
+      ) {
+        throw new BadRequestException(
+          `El producto ${productId} no existe o esta inactivo.`,
+        );
+      }
+
+      const previousStock = product.stock ?? 0;
+      const tracksStock =
+        (product.type ?? ProductType.PART) === ProductType.PART;
+      const quantityDelta = tracksStock
+        ? (requestedQuantities.get(productId) ?? 0) -
+          (currentQuantities.get(productId) ?? 0)
+        : 0;
+      if (tracksStock && quantityDelta > previousStock) {
+        throw new BadRequestException(
+          `Stock insuficiente para ${product.name}. Disponible: ${previousStock}.`,
+        );
+      }
+      product.stock = tracksStock ? previousStock - quantityDelta : 0;
+      products.set(productId, product);
+      if (quantityDelta !== 0) {
+        changes.push({ product, previousStock });
+      }
+    }
+
+    return {
+      items: requestedItems.map((item) => {
+        const product = products.get(item.productId);
+        if (!product) {
+          throw new BadRequestException(
+            `No fue posible resolver el producto ${item.productId}.`,
+          );
+        }
+        return {
+          productId: item.productId,
+          productName: product.name,
+          unitPrice: product.price,
+          quantity: item.quantity || 1,
+        };
+      }),
+      changes,
+    };
+  }
+
+  private async saveInventoryPlan(plan: InventoryPlan): Promise<void> {
+    for (const change of plan.changes) {
+      await this.productRepository.save(change.product);
+    }
+  }
+
+  private async rollbackInventoryPlan(plan: InventoryPlan): Promise<void> {
+    for (const change of plan.changes) {
+      change.product.stock = change.previousStock;
+      await this.productRepository.save(change.product);
+    }
+  }
+
+  private async prepareDeletionInventoryPlan(
+    items: ServiceOrderItem[],
+  ): Promise<{ plan: InventoryPlan; skippedProductIds: string[] }> {
+    const quantities = new Map<string, number>();
+    for (const item of items ?? []) {
+      if (!item.productId) {
+        continue;
+      }
+      quantities.set(
+        item.productId,
+        (quantities.get(item.productId) ?? 0) + (item.quantity || 1),
+      );
+    }
+
+    const changes: InventoryPlan['changes'] = [];
+    const skippedProductIds: string[] = [];
+    for (const [productId, quantity] of quantities) {
+      const objectId = toObjectId(productId);
+      const product = objectId
+        ? await this.productRepository.findOne({ where: { _id: objectId } })
+        : null;
+      if (!product) {
+        skippedProductIds.push(productId);
+        this.logger.warn(
+          `service_order.delete.inventory_product_missing productId=${productId}`,
+        );
+        continue;
+      }
+      if ((product.type ?? ProductType.PART) !== ProductType.PART) {
+        continue;
+      }
+      const previousStock = product.stock ?? 0;
+      product.stock = previousStock + quantity;
+      changes.push({ product, previousStock });
+    }
+
+    return {
+      plan: { items: [], changes },
+      skippedProductIds,
+    };
+  }
+
+  private async attachDisplayNames(
+    order: ServiceOrder,
+  ): Promise<ServiceOrderView> {
+    const view = order as ServiceOrderView;
+    const customerObjectId = toObjectId(order.customerId);
+    const technicianObjectId = order.technicianId
+      ? toObjectId(order.technicianId)
+      : undefined;
+
+    const [customer, technician] = await Promise.all([
+      customerObjectId
+        ? this.customerRepository.findOne({ where: { _id: customerObjectId } })
+        : Promise.resolve(null),
+      technicianObjectId
+        ? this.technicianRepository.findOne({
+            where: { _id: technicianObjectId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    view.customerName = customer?.name;
+    view.technicianName = technician?.name;
+    return view;
+  }
 
   private generateOrderNumber(): string {
     const now = new Date();
@@ -54,15 +423,51 @@ export class ServiceOrdersService {
     }
   }
 
+  private async assertCustomerAvailable(customerId: string): Promise<void> {
+    const objectId = toObjectId(customerId);
+    const customer = objectId
+      ? await this.customerRepository.findOne({ where: { _id: objectId } })
+      : null;
+    if (!customer || customer.isActive === false) {
+      throw new BadRequestException(
+        'El cliente no existe o no esta disponible.',
+      );
+    }
+  }
+
+  private async assertTechnicianAvailable(
+    technicianId?: string | null,
+  ): Promise<void> {
+    if (!technicianId) {
+      return;
+    }
+    const objectId = toObjectId(technicianId);
+    const technician = objectId
+      ? await this.technicianRepository.findOne({ where: { _id: objectId } })
+      : null;
+    if (!technician || technician.isActive === false) {
+      throw new BadRequestException(
+        'El tecnico no existe o no esta disponible.',
+      );
+    }
+  }
+
   async create(
     createServiceOrderDto: CreateServiceOrderDto,
     actor?: AuditActor,
   ): Promise<ServiceOrder> {
     const { items, ...orderData } = createServiceOrderDto;
-
-    if (items && items.length > 0) {
-      this.ensureUniqueItems(items);
+    const role = this.getActorRole(actor);
+    if (role === UserRole.RECEPTIONIST && items && items.length > 0) {
+      throw new ForbiddenException(
+        'Los repuestos se registran durante el trabajo tecnico.',
+      );
     }
+
+    await this.assertCustomerAvailable(orderData.customerId);
+    await this.assertTechnicianAvailable(orderData.technicianId);
+
+    const inventoryPlan = await this.prepareInventoryPlan([], items ?? []);
 
     const order = this.serviceOrderRepository.create({
       ...orderData,
@@ -70,8 +475,8 @@ export class ServiceOrdersService {
       status: ServiceOrderStatus.PENDING,
     });
 
-    if (items && items.length > 0) {
-      const partsCost = items.reduce(
+    if (inventoryPlan.items.length > 0) {
+      const partsCost = inventoryPlan.items.reduce(
         (sum, item) => sum + item.unitPrice * (item.quantity || 1),
         0,
       );
@@ -79,12 +484,16 @@ export class ServiceOrdersService {
       order.totalCost = partsCost + (order.laborCost || 0);
     }
 
-    order.items = (items || []).map((item) => ({
-      ...item,
-      quantity: item.quantity || 1,
-    }));
+    order.items = inventoryPlan.items;
 
-    const savedOrder = await this.serviceOrderRepository.save(order);
+    await this.saveInventoryPlan(inventoryPlan);
+    let savedOrder: ServiceOrder;
+    try {
+      savedOrder = await this.serviceOrderRepository.save(order);
+    } catch (error) {
+      await this.rollbackInventoryPlan(inventoryPlan);
+      throw error;
+    }
     this.logger.log(
       `service_order.created orderId=${savedOrder.id ?? 'unknown'} orderNumber=${savedOrder.orderNumber}`,
     );
@@ -100,13 +509,41 @@ export class ServiceOrdersService {
       },
     );
 
-    return savedOrder;
+    return this.attachDisplayNames(savedOrder);
   }
 
   async findAll(): Promise<ServiceOrder[]> {
     return this.serviceOrderRepository.find({
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findVisible(
+    actor?: AuditActor,
+    status?: ServiceOrderStatus,
+    customerId?: string,
+  ): Promise<ServiceOrderView[]> {
+    const role = this.getActorRole(actor);
+    const where: Partial<ServiceOrder> = {};
+    if (status) {
+      where.status = status;
+    }
+    if (customerId) {
+      where.customerId = customerId;
+    }
+    if (role === UserRole.TECHNICIAN) {
+      if (!actor?.technicianId) {
+        throw new ForbiddenException(
+          'El usuario tecnico no esta vinculado a un perfil tecnico.',
+        );
+      }
+      where.technicianId = actor.technicianId;
+    }
+    const orders = await this.serviceOrderRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
+    return Promise.all(orders.map((order) => this.attachDisplayNames(order)));
   }
 
   async findOne(id: string): Promise<ServiceOrder> {
@@ -124,6 +561,17 @@ export class ServiceOrdersService {
       throw new NotFoundException(`Service Order #${id} not found`);
     }
     return order;
+  }
+
+  async findOneVisible(
+    id: string,
+    actor?: AuditActor,
+  ): Promise<ServiceOrderView> {
+    const order = await this.findOne(id);
+    if (this.getActorRole(actor) === UserRole.TECHNICIAN) {
+      this.assertTechnicianCanAccess(order, actor);
+    }
+    return this.attachDisplayNames(order);
   }
 
   async findByStatus(status: ServiceOrderStatus): Promise<ServiceOrder[]> {
@@ -146,33 +594,59 @@ export class ServiceOrdersService {
     actor?: AuditActor,
   ): Promise<ServiceOrder> {
     const order = await this.findOne(id);
+    const permittedUpdate = this.validateUpdatePermissions(
+      order,
+      updateServiceOrderDto,
+      actor,
+    );
     const previousStatus = order.status;
-    Object.assign(order, updateServiceOrderDto);
+    const { items, ...updateData } = permittedUpdate;
+    if (
+      permittedUpdate.customerId &&
+      permittedUpdate.customerId !== order.customerId
+    ) {
+      await this.assertCustomerAvailable(permittedUpdate.customerId);
+    }
+    if (
+      permittedUpdate.technicianId &&
+      permittedUpdate.technicianId !== order.technicianId
+    ) {
+      await this.assertTechnicianAvailable(permittedUpdate.technicianId);
+    }
+    Object.assign(order, updateData);
 
-    if (updateServiceOrderDto.laborCost !== undefined) {
-      order.totalCost =
-        (updateServiceOrderDto.laborCost || 0) + order.partsCost;
+    if (permittedUpdate.laborCost !== undefined) {
+      order.totalCost = (permittedUpdate.laborCost || 0) + order.partsCost;
     }
 
-    if (updateServiceOrderDto.items) {
-      this.ensureUniqueItems(updateServiceOrderDto.items);
-      const partsCost = updateServiceOrderDto.items.reduce(
+    let inventoryPlan: InventoryPlan | undefined;
+    if (items) {
+      inventoryPlan = await this.prepareInventoryPlan(order.items ?? [], items);
+      const partsCost = inventoryPlan.items.reduce(
         (sum, item) => sum + item.unitPrice * (item.quantity || 1),
         0,
       );
-      order.items = updateServiceOrderDto.items.map((item) => ({
-        ...item,
-        quantity: item.quantity || 1,
-      }));
+      order.items = inventoryPlan.items;
       order.partsCost = partsCost;
       order.totalCost = (order.laborCost || 0) + partsCost;
     }
 
-    if (updateServiceOrderDto.status === ServiceOrderStatus.DELIVERED) {
+    if (permittedUpdate.status === ServiceOrderStatus.DELIVERED) {
       order.deliveredAt = new Date();
     }
 
-    const savedOrder = await this.serviceOrderRepository.save(order);
+    if (inventoryPlan) {
+      await this.saveInventoryPlan(inventoryPlan);
+    }
+    let savedOrder: ServiceOrder;
+    try {
+      savedOrder = await this.serviceOrderRepository.save(order);
+    } catch (error) {
+      if (inventoryPlan) {
+        await this.rollbackInventoryPlan(inventoryPlan);
+      }
+      throw error;
+    }
     this.logger.log(
       `service_order.updated orderId=${savedOrder.id ?? id} status=${previousStatus}->${savedOrder.status}`,
     );
@@ -184,19 +658,40 @@ export class ServiceOrdersService {
       {
         previousStatus,
         currentStatus: savedOrder.status,
-        fields: Object.keys(updateServiceOrderDto),
+        fields: Object.keys(permittedUpdate),
       },
     );
-
-
-
-    return savedOrder;
+    return this.findOneVisible(savedOrder.id ?? id, actor);
   }
 
   async cancel(id: string, actor?: AuditActor): Promise<ServiceOrder> {
     const order = await this.findOne(id);
+    if (this.getActorRole(actor) !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Solo administracion puede cancelar ordenes.',
+      );
+    }
+    if (order.status === ServiceOrderStatus.CANCELLED) {
+      return this.attachDisplayNames(order);
+    }
+    if (order.status === ServiceOrderStatus.DELIVERED) {
+      throw new BadRequestException(
+        'Una orden entregada no puede ser cancelada.',
+      );
+    }
+    const inventoryPlan = await this.prepareInventoryPlan(
+      order.items ?? [],
+      [],
+    );
     order.status = ServiceOrderStatus.CANCELLED;
-    const savedOrder = await this.serviceOrderRepository.save(order);
+    await this.saveInventoryPlan(inventoryPlan);
+    let savedOrder: ServiceOrder;
+    try {
+      savedOrder = await this.serviceOrderRepository.save(order);
+    } catch (error) {
+      await this.rollbackInventoryPlan(inventoryPlan);
+      throw error;
+    }
     this.logger.log(`service_order.cancelled orderId=${savedOrder.id ?? id}`);
     await this.auditService.record(
       'service_order.cancelled',
@@ -207,14 +702,81 @@ export class ServiceOrdersService {
         status: savedOrder.status,
       },
     );
-    return savedOrder;
+    return this.findOneVisible(savedOrder.id ?? id, actor);
+  }
+
+  async deletePermanent(id: string, actor?: AuditActor): Promise<void> {
+    const order = await this.findOne(id);
+    if (this.getActorRole(actor) !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Solo administracion puede eliminar ordenes definitivamente.',
+      );
+    }
+
+    const shouldRestoreInventory = ![
+      ServiceOrderStatus.CANCELLED,
+      ServiceOrderStatus.DELIVERED,
+    ].includes(order.status);
+    const inventoryRestoration = shouldRestoreInventory
+      ? await this.prepareDeletionInventoryPlan(order.items ?? [])
+      : undefined;
+    const inventoryPlan = inventoryRestoration?.plan;
+
+    if (inventoryPlan) {
+      await this.saveInventoryPlan(inventoryPlan);
+    }
+
+    try {
+      await this.serviceOrderRepository.delete(order._id ?? id);
+    } catch (error) {
+      if (inventoryPlan) {
+        await this.rollbackInventoryPlan(inventoryPlan);
+      }
+      throw error;
+    }
+
+    this.logger.warn(
+      `service_order.deleted_permanently orderId=${order.id ?? id} status=${order.status}`,
+    );
+    await this.auditService.record(
+      'service_order.deleted_permanently',
+      'service_order',
+      order.id ?? id,
+      actor,
+      {
+        orderNumber: order.orderNumber,
+        status: order.status,
+        customerId: order.customerId,
+        technicianId: order.technicianId,
+        deviceType: order.deviceType,
+        deviceBrand: order.deviceBrand,
+        deviceModel: order.deviceModel,
+        serialNumber: order.serialNumber,
+        problemDescription: order.problemDescription,
+        diagnosis: order.diagnosis,
+        workDone: order.workDone,
+        priority: order.priority,
+        laborCost: order.laborCost,
+        partsCost: order.partsCost,
+        totalCost: order.totalCost,
+        items: order.items ?? [],
+        estimatedDelivery: order.estimatedDelivery,
+        deliveredAt: order.deliveredAt,
+        inventoryRestorationAttempted: shouldRestoreInventory,
+        inventoryRestored:
+          shouldRestoreInventory &&
+          (inventoryRestoration?.skippedProductIds.length ?? 0) === 0,
+        inventoryRestoreSkippedProductIds:
+          inventoryRestoration?.skippedProductIds ?? [],
+      },
+    );
   }
 
   async buildPrintPayload(
     id: string,
     actor?: AuditActor,
   ): Promise<ThermalTicketInput> {
-    const order = await this.findOne(id);
+    const order = await this.findOneVisible(id, actor);
 
     let customerName: string | undefined;
     const customerObjectId = toObjectId(order.customerId);

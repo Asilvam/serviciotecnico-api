@@ -25,9 +25,9 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
+  @Roles(UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Create a new product/part (admin and receptionist)',
+    summary: 'Create a new product/part (admin only)',
   })
   create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
@@ -46,8 +46,8 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST)
-  @ApiOperation({ summary: 'Update product (admin and receptionist)' })
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update product (admin only)' })
   update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
     return this.productsService.update(id, updateProductDto);
   }

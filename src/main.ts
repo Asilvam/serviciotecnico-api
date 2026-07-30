@@ -3,6 +3,24 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+function buildCorsOrigins(): string[] {
+  const configuredOrigins = process.env.CORS_ORIGINS
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  if (configuredOrigins?.length) {
+    return configuredOrigins;
+  }
+
+  return [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'https://st.serviciosasm.cl',
+    'https://serviciotecnico-front.pages.dev',
+  ];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -47,7 +65,10 @@ async function bootstrap() {
     customSiteTitle: `${swaggerTitle} Docs`,
   });
 
-  app.enableCors();
+  app.enableCors({
+    origin: buildCorsOrigins(),
+    credentials: true,
+  });
 
   await app.listen(process.env.PORT ?? 3500, '0.0.0.0');
 }
