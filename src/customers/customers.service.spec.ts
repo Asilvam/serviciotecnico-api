@@ -15,6 +15,7 @@ const mockCustomer: Customer = {
   id: '67d0f4a5f99f719467f91a02',
   name: 'Juan Pérez',
   email: 'juan@example.com',
+  rut: '12345678-5',
   phone: '+56912345678',
   address: 'Av. Providencia 123',
   isActive: true,
@@ -83,6 +84,7 @@ describe('CustomersService', () => {
       const result = await service.create({
         name: 'Juan Pérez',
         email: 'juan@example.com',
+        rut: '12.345.678-5',
       });
 
       expect(result).toEqual(mockCustomer);
@@ -92,8 +94,43 @@ describe('CustomersService', () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
 
       await expect(
-        service.create({ name: 'Juan', email: 'juan@example.com' }),
+        service.create({
+          name: 'Juan',
+          email: 'juan@example.com',
+          rut: '12.345.678-5',
+        }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should normalize the RUT before saving the customer', async () => {
+      mockCustomerRepository.findOne.mockResolvedValue(null);
+      mockCustomerRepository.create.mockReturnValue(mockCustomer);
+      mockCustomerRepository.save.mockResolvedValue(mockCustomer);
+
+      const result = await service.create({
+        name: 'Juan Pérez',
+        email: 'juan@example.com',
+        rut: '12.345.678-5',
+      });
+
+      expect(mockCustomerRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ rut: '12345678-5' }),
+      );
+      expect(result.rut).toBe('12345678-5');
+    });
+
+    it('should reject a duplicated RUT', async () => {
+      mockCustomerRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(mockCustomer);
+
+      await expect(
+        service.create({
+          name: 'Otro cliente',
+          email: 'otro@example.com',
+          rut: '12.345.678-5',
+        }),
+      ).rejects.toThrow('El RUT ya está registrado.');
     });
   });
 
@@ -166,6 +203,23 @@ describe('CustomersService', () => {
           email: 'other@example.com',
         }),
       ).rejects.toThrow(ConflictException);
+    });
+
+    it('should reject a duplicated RUT when updating', async () => {
+      const otherCustomer = {
+        ...mockCustomer,
+        id: '67d0f4a5f99f719467f91a03',
+        rut: '11111111-1',
+      };
+      mockCustomerRepository.findOne
+        .mockResolvedValueOnce({ ...mockCustomer })
+        .mockResolvedValueOnce(otherCustomer);
+
+      await expect(
+        service.update('67d0f4a5f99f719467f91a02', {
+          rut: '11.111.111-1',
+        }),
+      ).rejects.toThrow('El RUT ya está registrado.');
     });
 
     it('should let administration reactivate a customer', async () => {

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -25,6 +26,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 import { Product, ProductType } from '../products/product.entity';
 import { UserRole } from '../auth/user.entity';
+import { createTrackingToken, readTrackingToken } from './tracking-token.util';
+import { ConfigService } from '@nestjs/config';
 
 type InventoryPlan = {
   items: ServiceOrderItem[];
@@ -34,6 +37,15 @@ type InventoryPlan = {
 export type ServiceOrderView = ServiceOrder & {
   customerName?: string;
   technicianName?: string;
+};
+
+const PUBLIC_STATUS_LABELS: Record<ServiceOrderStatus, string> = {
+  [ServiceOrderStatus.PENDING]: 'Pendiente',
+  [ServiceOrderStatus.IN_PROGRESS]: 'En proceso',
+  [ServiceOrderStatus.WAITING_PARTS]: 'En espera de repuestos',
+  [ServiceOrderStatus.COMPLETED]: 'Completada',
+  [ServiceOrderStatus.DELIVERED]: 'Entregada',
+  [ServiceOrderStatus.CANCELLED]: 'Cancelada',
 };
 
 @Injectable()
@@ -50,6 +62,7 @@ export class ServiceOrdersService {
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
     private auditService: AuditService,
+    private configService: ConfigService,
   ) {}
 
   private getActorRole(actor?: AuditActor): UserRole {
@@ -823,6 +836,10 @@ export class ServiceOrdersService {
     return {
       orderId: order.id ?? id,
       orderNumber: order.orderNumber,
+      trackingToken: createTrackingToken(
+        order.id ?? id,
+        this.configService.getOrThrow<string>('TRACKING_SECRET'),
+      ),
       createdAt: order.createdAt,
       status: order.status,
       priority: order.priority,
@@ -848,5 +865,66 @@ export class ServiceOrdersService {
         unitPrice: item.unitPrice,
       })),
     };
+  }
+
+  async findPublicTracking(token: string) {
+    const orderId = readTrackingToken(
+      token,
+      this.configService.getOrThrow<string>('TRACKING_SECRET'),
+    );
+    if (!orderId) {
+      throw new NotFoundException('Orden de servicio no encontrada.');
+    }
+    const objectId = toObjectId(orderId);
+    const order = objectId
+      ? await this.serviceOrderRepository.findOne({ where: { _id: objectId } })
+      : null;
+    if (!order) {
+      throw new NotFoundException('Orden de servicio no encontrada.');
+    }
+    const trackingExpiresAt = this.getTrackingExpiration(order);
+    if (trackingExpiresAt && trackingExpiresAt.getTime() <= Date.now()) {
+      throw new GoneException('El seguimiento de esta orden ha expirado.');
+    }
+
+    return {
+      orderNumber: order.orderNumber,
+      device: {
+        type: order.deviceType,
+        brand: order.deviceBrand,
+        model: order.deviceModel || undefined,
+      },
+      status: order.status,
+      statusLabelEs: PUBLIC_STATUS_LABELS[order.status],
+      estimatedDelivery: order.estimatedDelivery,
+      updatedAt: order.updatedAt,
+      ...(trackingExpiresAt ? { trackingExpiresAt } : {}),
+    };
+  }
+
+  private getTrackingExpiration(order: ServiceOrder): Date | undefined {
+    if (
+      order.status !== ServiceOrderStatus.DELIVERED &&
+      order.status !== ServiceOrderStatus.CANCELLED
+    ) {
+      return undefined;
+    }
+
+    const terminalDate =
+      order.status === ServiceOrderStatus.DELIVERED
+        ? (order.deliveredAt ?? order.updatedAt)
+        : order.updatedAt;
+    if (!terminalDate) {
+      return undefined;
+    }
+
+    const terminalTimestamp = new Date(terminalDate).getTime();
+    if (Number.isNaN(terminalTimestamp)) {
+      return undefined;
+    }
+    const retentionDays = this.configService.getOrThrow<number>(
+      'TRACKING_RETENTION_DAYS',
+    );
+    return new Date(terminalTimestamp + retentionDays * 24 * 60 * 60 * 1000);
   }
 }

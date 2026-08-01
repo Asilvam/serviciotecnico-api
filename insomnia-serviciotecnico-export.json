@@ -323,10 +323,14 @@
       "_id": "req_flow_print58",
       "_type": "request",
       "parentId": "fld_orders_printing_flow",
-      "name": "04 - Print 80mm Ticket",
-      "description": "Genera el ticket termico. Valida content, mimeType y width=48.",
+      "name": "04 - Print Configured Document",
+      "description": "Despacha el ticket termico o resumen PDF seleccionado.",
       "method": "POST",
-      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-80mm",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"printerProfile\": \"system_pdf\"\n}"
+      },
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"
@@ -406,9 +410,13 @@
       "_id": "req_orders_print58",
       "_type": "request",
       "parentId": "fld_orders_printing",
-      "name": "Print 80mm Ticket",
+      "name": "Print Configured Document",
       "method": "POST",
-      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print-80mm",
+      "url": "{{ _.base_url }}/service-orders/{{ _.order_id }}/print",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"printerProfile\": \"system_pdf\"\n}"
+      },
       "authentication": {
         "type": "bearer",
         "token": "{{ _.token }}"
@@ -536,4 +544,3 @@
     }
   ]
 }
-

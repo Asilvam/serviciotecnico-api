@@ -1,6 +1,6 @@
 # Servicio Técnico API
 
-API REST construida con [NestJS](https://nestjs.com/) para gestionar un negocio de servicio técnico: autenticación, clientes, técnicos, productos, órdenes de servicio, auditoría e impresión térmica de tickets.
+API REST construida con [NestJS](https://nestjs.com/) para gestionar un negocio de servicio técnico: autenticación, clientes, técnicos, productos, órdenes de servicio, auditoría e impresión de tickets térmicos o resúmenes PDF.
 
 ## Resumen
 
@@ -9,7 +9,7 @@ API REST construida con [NestJS](https://nestjs.com/) para gestionar un negocio 
 - 🔧 Gestión de técnicos, especialidades y disponibilidad.
 - 📦 CRUD de productos / repuestos.
 - 📋 Órdenes de servicio con permisos por rol, estados, costos, repuestos y control de stock.
-- 🧾 Generación de ticket térmico de **80 mm** para órdenes.
+- 🧾 Generación de ticket térmico de **80 mm** o resumen PDF A4/Carta.
 - 📚 Swagger en `/api`.
 - 🧾 Auditoría de acciones sensibles, visible solo para usuarios `admin`.
 - 🗄️ Persistencia en **MongoDB Atlas** usando **TypeORM**.
@@ -58,11 +58,29 @@ Variables disponibles:
 | `MONGODB_URI` | URI de conexión a MongoDB Atlas | `mongodb+srv://...` |
 | `MONGODB_DB` | Nombre de la base de datos | `serviciotecnico` |
 | `JWT_SECRET` | Secreto para firmar JWT | `cambia-esto-en-produccion` |
+| `PRINT_TOKEN` | Secreto compartido exclusivamente con el print agent | valor aleatorio largo |
+| `DEFAULT_PRINTER_ID` | Impresora lógica que recibe los trabajos | `default-printer` |
+| `PRINT_PROFILE` | Perfil usado si la solicitud no especifica uno | `thermal_escpos` |
+| `SYSTEM_PAPER_SIZE` | Tamaño del resumen PDF: `A4` o `LETTER` | `LETTER` |
+| `PRINT_ACK_TIMEOUT_MS` | Tiempo máximo para que el agent acepte el job | `5000` |
+| `PUBLIC_TRACKING_BASE_URL` | Origen público usado para construir el QR | `http://localhost:5173` |
+| `TRACKING_SECRET` | Secreto para firmar enlaces de seguimiento; usa JWT_SECRET como fallback | valor aleatorio largo |
+| `TRACKING_RETENTION_DAYS` | Días que se conserva el seguimiento después de entrega o cancelación | `30` |
 
 ### Notas importantes
 
+- `ConfigModule` carga, normaliza y valida todas las variables al iniciar. Los
+  servicios y el bootstrap las consumen mediante `ConfigService`.
+- `JWT_SECRET` y `PRINT_TOKEN` deben contener valores reales; los placeholders
+  como `changeme` o `replace-*` detienen el arranque.
+- Si `TRACKING_SECRET` está ausente o conserva el placeholder del ejemplo, se
+  usa el `JWT_SECRET` validado. El placeholder nunca se utiliza para firmar QR.
+- En producción, `MONGODB_URI` es obligatorio.
+- `PORT`, `PRINT_ACK_TIMEOUT_MS`, `PRINT_PROFILE`, `SYSTEM_PAPER_SIZE` y
+  `TRACKING_RETENTION_DAYS` y `CORS_ORIGINS` se validan antes de abrir el
+  servidor.
 - En local, si tu `.env` tiene `PORT=3500`, la API levantará en `http://localhost:3500`.
-- En `src/main.ts`, el fallback es `4500`, pero **solo se usa si `PORT` no está definido**.
+- En `src/main.ts`, el fallback es `3500`, pero **solo se usa si `PORT` no está definido**.
 - La conexión actual del proyecto está orientada a **MongoDB**, no a SQLite.
 
 ## Ejecutar el proyecto
@@ -202,10 +220,24 @@ Roles soportados:
 Comportamiento:
 
 - Admin recibe clientes activos e inactivos; Recepción solo recibe clientes disponibles.
+- Todo cliente nuevo requiere un RUT chileno válido. Se verifica el dígito verificador, se normaliza como `12345678-5` y se rechazan duplicados.
+- Los registros históricos sin RUT siguen siendo compatibles y pueden completarse mediante `PATCH`.
 - Admin puede cambiar `isActive` mediante `PATCH`; Recepción puede corregir los demás datos, pero no cambiar el estado.
 - Un cliente no disponible no puede utilizarse al crear o reasignar una orden.
 - `DELETE /customers/:id` conserva el registro y establece `isActive=false`.
 - El borrado permanente solo se permite cuando el cliente no tiene órdenes asociadas y queda registrado en auditoría.
+
+Payload mínimo para crear un cliente:
+
+```json
+{
+  "name": "Juan Pérez",
+  "email": "juan@example.com",
+  "rut": "12.345.678-5"
+}
+```
+
+Las fechas se almacenan como instantes UTC. Toda fecha impresa por la API se presenta explícitamente con la zona `America/Santiago`.
 
 ### Technicians
 
@@ -240,7 +272,10 @@ Comportamiento:
 - `PATCH /service-orders/:id` (Admin, Recepcion y Tecnico)
 - `DELETE /service-orders/:id` (Admin únicamente; cancela la orden)
 - `DELETE /service-orders/:id/permanent` (Admin únicamente; borrado físico)
-- `POST /service-orders/:id/print-80mm` (Admin, Recepcion y Tecnico)
+- `POST /service-orders/:id/print` (Admin, Recepcion y Tecnico)
+- `POST /service-orders/:id/print-80mm` (alias compatible)
+- `GET /print-jobs/:jobId` (usuarios autenticados)
+- `GET /tracking/:token` (consulta pública con token firmado)
 
 Estados disponibles:
 
@@ -373,61 +408,74 @@ La respuesta incluye una acción lista para imprimir. La creación de la orden n
 	"id": "..."
   },
   "actions": {
-	"print80mm": {
+	"print": {
 	  "method": "POST",
-	  "url": "http://localhost:3500/service-orders/ORDER_ID/print-80mm"
+	  "url": "http://localhost:3500/service-orders/ORDER_ID/print"
 	}
   }
 }
 ```
 
-### 6. Generar ticket térmico 80mm (manual)
+### 6. Imprimir una orden (manual)
 
 ```bash
-curl -X POST http://localhost:3500/service-orders/ORDER_ID/print-80mm \
-  -H 'Authorization: Bearer TU_TOKEN'
+curl -X POST http://localhost:3500/service-orders/ORDER_ID/print \
+  -H 'Authorization: Bearer TU_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"printerProfile":"system_pdf"}'
 ```
+
+`printerProfile` acepta `thermal_escpos` o `system_pdf`. Si se omite, la API usa
+`PRINT_PROFILE`. Elegir “No imprimir” en el frontend no llama este endpoint ni
+crea un trabajo.
 
 Respuesta esperada:
 
 ```json
 {
+  "jobId": "8f910a4d-...",
+  "printerId": "default-printer",
+  "printerProfile": "system_pdf",
   "orderId": "...",
   "orderNumber": "OT-20260408-1234",
-  "mimeType": "text/plain",
-  "content": "...",
-  "width": 40,
-  "paperWidthMm": 80,
-  "generatedAt": "2026-04-08T00:00:00.000Z"
+  "status": "queued",
+  "queuedAt": "2026-04-08T00:00:00.000Z"
 }
 ```
 
-## Impresión térmica 80mm
+## Impresión térmica o resumen PDF
 
-La API **no imprime físicamente por sí sola**. Lo que hace es generar el contenido del ticket en texto plano para una impresora térmica de 80 mm.
+La API **no imprime físicamente por sí sola**. Crea un trabajo correlacionado, comprueba que el agent de la impresora esté conectado y lo envía únicamente a ese socket. Si no hay agent disponible responde `503`; si el agent acepta el trabajo responde `202` con un `jobId`.
 
-Características actuales del ticket:
+Cada solicitud puede elegir el documento con `printerProfile`:
 
-- `paperWidthMm: 80`
-- `width: 40` columnas en texto plano
-- `mimeType: text/plain`
+- `thermal_escpos`: ticket de 80 mm, 40 columnas y QR mediante USB ESC/POS.
+- `system_pdf`: resumen A4 o Carta con cliente, técnico, equipo, falla,
+  diagnóstico, trabajo, repuestos, costos, fechas y QR. El agent lo envía a la
+  impresora predeterminada del equipo.
+
+`PRINT_PROFILE` queda como fallback para clientes antiguos o solicitudes que no
+envíen el campo.
 
 El flujo recomendado es:
 
 1. El frontend crea la orden con `POST /service-orders`.
 2. El frontend solicita confirmación al usuario para imprimir.
-3. Si el usuario confirma, se llama `POST /service-orders/:id/print-80mm`.
-4. El backend genera y despacha el ticket al agente/local bridge.
-5. El agente/local bridge envía `content` a la impresora térmica.
+3. Si el usuario confirma, se llama `POST /service-orders/:id/print`.
+4. El backend genera y despacha el documento al agent registrado para `DEFAULT_PRINTER_ID`.
+5. El agent confirma recepción, encola e imprime un documento a la vez.
+6. El agent emite `print_sent` cuando el USB o la cola del sistema acepta los datos, o `print_error` con resultado confirmado o incierto.
+7. El frontend consulta `GET /print-jobs/:jobId` hasta obtener el resultado final.
 
-### Si imprimes desde una máquina local macOS
+El QR contiene un enlace firmado a `/tracking/:token`. Ese endpoint expone únicamente número de orden, equipo, estado y fechas públicas. Las órdenes `completed` continúan visibles hasta ser entregadas. Las órdenes `delivered` y `cancelled` conservan el seguimiento durante `TRACKING_RETENTION_DAYS`; después el endpoint responde `410 Gone` con un mensaje de seguimiento expirado.
 
-Puedes guardar `content` en un archivo `.txt` y mandarlo con `lp`:
+Los trabajos se persisten en la colección MongoDB `print_jobs`. `jobId` tiene índice único y `expiresAt` usa un índice TTL de 30 días. Los estados terminales son `sent_to_printer`, `sent_to_printer_with_warning`, `failed` y `unknown`; este último impide reintentos automáticos cuando no puede asegurarse si el dispositivo alcanzó a recibir los datos.
 
-```bash
-lpstat -p
-lp -d "NOMBRE_IMPRESORA" /ruta/al/ticket.txt
-```
+Si una orden ya tiene un trabajo `queued` o `printing` para la misma impresora, una solicitud repetida devuelve ese `jobId` y no vuelve a despachar el documento. Al desconectarse o reemplazarse el agent, sus trabajos activos pasan a `unknown`.
+
+En macOS/Linux, el perfil PDF usa CUPS mediante `lp` sin `-d`, por lo que toma
+la impresora predeterminada. En Windows usa el spooler local mediante
+`pdf-to-printer`; Windows no requiere CUPS.
 
 ### Si el backend está en la nube
 
@@ -475,8 +523,8 @@ insomnia-serviciotecnico-export.json
 Está alineada con:
 
 - `http://localhost:3500`
-- impresión `80mm`
-- endpoint `/service-orders/:id/print-80mm`
+- perfiles `thermal_escpos` y `system_pdf`
+- endpoint `/service-orders/:id/print`
 
 ## Scripts disponibles
 

@@ -14,6 +14,7 @@ import { ServiceOrder } from '../service-orders/service-order.entity';
 import { AuditService } from '../audit/audit.service';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 import { UserRole } from '../auth/user.entity';
+import { normalizeChileanRut } from '../common/chilean-rut.util';
 
 @Injectable()
 export class CustomersService {
@@ -26,13 +27,23 @@ export class CustomersService {
   ) {}
 
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
-    const existing = await this.customerRepository.findOne({
+    const existingEmail = await this.customerRepository.findOne({
       where: { email: createCustomerDto.email },
     });
-    if (existing) {
-      throw new ConflictException('Email already registered');
+    if (existingEmail) {
+      throw new ConflictException('El email ya está registrado.');
     }
-    const customer = this.customerRepository.create(createCustomerDto);
+    const normalizedRut = normalizeChileanRut(createCustomerDto.rut);
+    const existingRut = await this.customerRepository.findOne({
+      where: { rut: normalizedRut },
+    });
+    if (existingRut) {
+      throw new ConflictException('El RUT ya está registrado.');
+    }
+    const customer = this.customerRepository.create({
+      ...createCustomerDto,
+      rut: normalizedRut,
+    });
     return this.customerRepository.save(customer);
   }
 
@@ -74,10 +85,23 @@ export class CustomersService {
         where: { email: updateCustomerDto.email },
       });
       if (existing) {
-        throw new ConflictException('Email already registered');
+        throw new ConflictException('El email ya está registrado.');
       }
     }
-    Object.assign(customer, updateCustomerDto);
+    const normalizedRut = updateCustomerDto.rut
+      ? normalizeChileanRut(updateCustomerDto.rut)
+      : undefined;
+    if (normalizedRut && normalizedRut !== customer.rut) {
+      const existing = await this.customerRepository.findOne({
+        where: { rut: normalizedRut },
+      });
+      if (existing) {
+        throw new ConflictException('El RUT ya está registrado.');
+      }
+    }
+    Object.assign(customer, updateCustomerDto, {
+      ...(normalizedRut ? { rut: normalizedRut } : {}),
+    });
     return this.customerRepository.save(customer);
   }
 
@@ -112,6 +136,7 @@ export class CustomersService {
       {
         name: customer.name,
         email: customer.email,
+        rut: customer.rut,
         phone: customer.phone,
         address: customer.address,
         isActive: customer.isActive !== false,

@@ -8,6 +8,7 @@ import { Technician } from '../technicians/technician.entity';
 import { PrintingModule } from '../printing/printing.module';
 import { AuditModule } from '../audit/audit.module';
 import { Product } from '../products/product.entity';
+import { PublicTrackingController } from './public-tracking.controller';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { Product } from '../products/product.entity';
     PrintingModule,
     AuditModule,
   ],
-  controllers: [ServiceOrdersController],
+  controllers: [ServiceOrdersController, PublicTrackingController],
   providers: [ServiceOrdersService],
   exports: [ServiceOrdersService],
 })

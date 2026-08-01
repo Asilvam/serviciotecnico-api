@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 export interface ThermalTicketInput {
   orderId: string;
   orderNumber: string;
+  trackingToken: string;
   createdAt?: Date;
   status: string;
   priority: string;
@@ -103,7 +104,7 @@ export class ThermalTicketFormatter {
 
     if (input.estimatedDelivery) {
       lines.push(
-        `Entrega estimada: ${this.formatDate(input.estimatedDelivery)}`,
+        `Entrega estimada: ${this.formatCalendarDate(input.estimatedDelivery)}`,
       );
     }
     if (input.deliveredAt) {
@@ -193,10 +194,18 @@ export class ThermalTicketFormatter {
     if (!date) {
       return 'N/A';
     }
-    return new Date(date).toLocaleString('es-CO', {
+    return new Date(date).toLocaleString('es-CL', {
       dateStyle: 'short',
       timeStyle: 'short',
       hour12: false,
+      timeZone: 'America/Santiago',
+    });
+  }
+
+  private formatCalendarDate(date: Date): string {
+    return new Date(date).toLocaleDateString('es-CL', {
+      dateStyle: 'short',
+      timeZone: 'UTC',
     });
   }
 
