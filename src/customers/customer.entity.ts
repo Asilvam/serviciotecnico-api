@@ -3,6 +3,7 @@ import {
   ObjectIdColumn,
   Column,
   CreateDateColumn,
+  Index,
   UpdateDateColumn,
 } from 'typeorm';
 import { Transform } from 'class-transformer';
@@ -25,6 +26,10 @@ export class Customer {
 
   @Column({ unique: true })
   email: string;
+
+  @Index('IDX_CUSTOMER_RUT_UNIQUE', { unique: true, sparse: true })
+  @Column({ nullable: true })
+  rut?: string;
 
   @Column({ nullable: true })
   phone: string;

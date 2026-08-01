@@ -220,10 +220,24 @@ Roles soportados:
 Comportamiento:
 
 - Admin recibe clientes activos e inactivos; Recepción solo recibe clientes disponibles.
+- Todo cliente nuevo requiere un RUT chileno válido. Se verifica el dígito verificador, se normaliza como `12345678-5` y se rechazan duplicados.
+- Los registros históricos sin RUT siguen siendo compatibles y pueden completarse mediante `PATCH`.
 - Admin puede cambiar `isActive` mediante `PATCH`; Recepción puede corregir los demás datos, pero no cambiar el estado.
 - Un cliente no disponible no puede utilizarse al crear o reasignar una orden.
 - `DELETE /customers/:id` conserva el registro y establece `isActive=false`.
 - El borrado permanente solo se permite cuando el cliente no tiene órdenes asociadas y queda registrado en auditoría.
+
+Payload mínimo para crear un cliente:
+
+```json
+{
+  "name": "Juan Pérez",
+  "email": "juan@example.com",
+  "rut": "12.345.678-5"
+}
+```
+
+Las fechas se almacenan como instantes UTC. Toda fecha impresa por la API se presenta explícitamente con la zona `America/Santiago`.
 
 ### Technicians
 
