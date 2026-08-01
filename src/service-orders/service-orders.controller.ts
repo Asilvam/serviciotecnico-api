@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  HttpCode,
+  HttpStatus,
   UseGuards,
   Query,
   Req,
@@ -25,7 +27,11 @@ import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 import { ServiceOrderStatus } from './service-order.entity';
 import { PrintingService } from '../printing/printing.service';
 import type { ThermalTicketInput } from '../printing/thermal-ticket-formatter';
-import type { PrintTicketResult } from '../printing/interfaces/print-ticket-result.interface';
+import type {
+  PrinterProfile,
+  PrintDispatchResult,
+} from '../printing/interfaces/print-ticket-result.interface';
+import { PrintServiceOrderDto } from '../printing/dto/print-service-order.dto';
 import type { AuditActor } from '../audit/interfaces/audit-actor.interface';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -78,14 +84,18 @@ export class ServiceOrdersController {
     );
     const orderId = order.id ?? '';
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const printEndpoint = `${baseUrl}/service-orders/${orderId}/print-80mm`;
+    const printEndpoint = `${baseUrl}/service-orders/${orderId}/print`;
 
     return {
       order,
       actions: {
-        print80mm: {
+        print: {
           method: 'POST',
           url: printEndpoint,
+        },
+        print80mm: {
+          method: 'POST',
+          url: `${baseUrl}/service-orders/${orderId}/print-80mm`,
         },
       },
     };
@@ -149,6 +159,7 @@ export class ServiceOrdersController {
   }
 
   @Post(':id/print-80mm')
+  @HttpCode(HttpStatus.ACCEPTED)
   @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
   @ApiOperation({
     summary:
@@ -158,12 +169,36 @@ export class ServiceOrdersController {
   async print80mm(
     @Param('id') id: string,
     @Req() req: Request,
-  ): Promise<PrintTicketResult> {
+  ): Promise<PrintDispatchResult> {
+    return this.dispatchPrint(id, req, 'thermal_escpos');
+  }
+
+  @Post(':id/print')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Roles(UserRole.ADMIN, UserRole.RECEPTIONIST, UserRole.TECHNICIAN)
+  @ApiOperation({
+    summary:
+      'Dispatch a service order to the configured thermal or system printer',
+  })
+  @ApiParam({ name: 'id', type: String, description: 'Service order ObjectId' })
+  async print(
+    @Param('id') id: string,
+    @Req() req: Request,
+    @Body() printServiceOrderDto?: PrintServiceOrderDto,
+  ): Promise<PrintDispatchResult> {
+    return this.dispatchPrint(id, req, printServiceOrderDto?.printerProfile);
+  }
+
+  private async dispatchPrint(
+    id: string,
+    req: Request,
+    printerProfile?: PrinterProfile,
+  ): Promise<PrintDispatchResult> {
     const payload: ThermalTicketInput =
       await this.serviceOrdersService.buildPrintPayload(
         id,
         this.getAuditActor(req),
       );
-    return this.printingService.generateAndDispatch80mmTicket(payload);
+    return this.printingService.generateAndDispatch(payload, printerProfile);
   }
 }
