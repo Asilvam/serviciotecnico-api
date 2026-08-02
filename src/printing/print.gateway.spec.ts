@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import type { Server, Socket } from 'socket.io';
+import type { Namespace, Socket } from 'socket.io';
 import { PrintGateway } from './print.gateway';
 import { PrintJobsService } from './print-jobs.service';
 import type { PrintTicketResult } from './interfaces/print-ticket-result.interface';
@@ -87,8 +87,8 @@ describe('PrintGateway', () => {
       } as unknown as PrintJobsService,
     );
     gateway.server = {
-      sockets: { sockets },
-    } as unknown as Server;
+      sockets,
+    } as unknown as Namespace;
     return { gateway, sockets };
   }
 

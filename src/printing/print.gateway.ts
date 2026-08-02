@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Socket } from 'socket.io';
 import type {
   PrintTicketAcknowledgement,
   PrintTicketResult,
@@ -52,7 +52,7 @@ export class PrintDispatchException extends ServiceUnavailableException {
   namespace: '/',
 })
 export class PrintGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer() server: Server;
+  @WebSocketServer() server: Namespace;
   private readonly logger = new Logger(PrintGateway.name);
   private readonly agentsByPrinter = new Map<string, RegisteredAgent>();
   private readonly agentsBySocket = new Map<string, RegisteredAgent>();
@@ -92,7 +92,7 @@ export class PrintGateway implements OnGatewayConnection, OnGatewayDisconnect {
         'AGENT_REPLACED',
         'El agente fue reemplazado mientras tenia trabajos pendientes.',
       );
-      this.server.sockets.sockets.get(previous.socketId)?.disconnect(true);
+      this.server.sockets.get(previous.socketId)?.disconnect(true);
     }
 
     const registration = { socketId: client.id, agentId, printerId };
@@ -127,7 +127,7 @@ export class PrintGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!registration) {
       return false;
     }
-    return Boolean(this.server.sockets.sockets.get(registration.socketId));
+    return Boolean(this.server.sockets.get(registration.socketId));
   }
 
   async dispatchToPrinter(
@@ -136,7 +136,7 @@ export class PrintGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ): Promise<PrintTicketAcknowledgement> {
     const registration = this.agentsByPrinter.get(printerId);
     const socket = registration
-      ? this.server.sockets.sockets.get(registration.socketId)
+      ? this.server.sockets.get(registration.socketId)
       : undefined;
     if (!registration || !socket) {
       throw new PrintDispatchException(
