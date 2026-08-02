@@ -134,6 +134,38 @@ describe('PrintingService', () => {
     expect(dispatchToPrinter).not.toHaveBeenCalled();
   });
 
+  it('marks the job failed when ticket generation throws', async () => {
+    const gateway = {
+      isPrinterConnected: jest.fn().mockReturnValue(true),
+      dispatchToPrinter: jest.fn(),
+    } as unknown as PrintGateway;
+    const jobs = createPrintJobsMock();
+    const markFailedSpy = jest.spyOn(jobs, 'markFailed');
+    const formatter = {
+      format: jest.fn(() => {
+        throw new Error('Invalid ticket date');
+      }),
+      getWidth: jest.fn().mockReturnValue(40),
+      getPaperWidthMm: jest.fn().mockReturnValue(80),
+    } as unknown as ThermalTicketFormatter;
+    const service = new PrintingService(
+      formatter,
+      gateway,
+      jobs,
+      new ConfigService({ DEFAULT_PRINTER_ID: 'reception-80mm' }),
+    );
+
+    await expect(service.generateAndDispatch(thermalInput)).rejects.toThrow(
+      'Invalid ticket date',
+    );
+    expect(markFailedSpy).toHaveBeenCalledWith(
+      queuedJob.jobId,
+      queuedJob.printerId,
+      'TICKET_GENERATION_FAILED',
+      'Invalid ticket date',
+    );
+  });
+
   it('returns an unknown job instead of claiming failure after an acknowledgement timeout', async () => {
     const unknownJob: PrintJobResult = {
       ...queuedJob,
@@ -202,6 +234,8 @@ describe('PrintingService', () => {
         ...thermalInput,
         customerName: 'Cliente Ejemplo',
         diagnosis: 'Fuente de poder defectuosa',
+        createdAt: '2026-08-02T09:39:43.000Z',
+        estimatedDelivery: '2026-08-15',
         laborCost: 20000,
         partsCost: 15000,
         totalCost: 35000,
@@ -226,6 +260,8 @@ describe('PrintingService', () => {
         summary: expect.objectContaining({
           customerName: 'Cliente Ejemplo',
           diagnosis: 'Fuente de poder defectuosa',
+          createdAt: '2026-08-02T09:39:43.000Z',
+          estimatedDelivery: '2026-08-15',
           totalCost: 35000,
           items: [
             {

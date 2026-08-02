@@ -31,6 +31,27 @@ const PRIORITY_LABELS: Record<string, string> = {
   urgent: 'URGENTE',
 };
 
+function toIsoInstant(value?: Date | string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function toCalendarDate(value?: Date | string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    const calendarDate = /^(\d{4}-\d{2}-\d{2})/.exec(value)?.[1];
+    if (calendarDate) {
+      return calendarDate;
+    }
+  }
+  return toIsoInstant(value)?.slice(0, 10);
+}
+
 @Injectable()
 export class PrintingService {
   private readonly logger = new Logger(PrintingService.name);
@@ -81,12 +102,25 @@ export class PrintingService {
       orderId: payload.orderId,
       orderNumber: payload.orderNumber,
     });
-    const ticket = this.generateTicket(
-      payload,
-      job.jobId,
-      printerId,
-      printerProfile,
-    );
+    let ticket: PrintTicketResult;
+    try {
+      ticket = this.generateTicket(
+        payload,
+        job.jobId,
+        printerId,
+        printerProfile,
+      );
+    } catch (error) {
+      await this.printJobsService.markFailed(
+        job.jobId,
+        printerId,
+        'TICKET_GENERATION_FAILED',
+        error instanceof Error
+          ? error.message
+          : 'No fue posible generar el documento de impresion.',
+      );
+      throw error;
+    }
 
     try {
       await this.printGateway.dispatchToPrinter(printerId, ticket);
@@ -162,7 +196,7 @@ export class PrintingService {
         statusLabelEs,
       },
       summary: {
-        createdAt: payload.createdAt?.toISOString(),
+        createdAt: toIsoInstant(payload.createdAt),
         status: payload.status,
         statusLabelEs,
         priority: payload.priority,
@@ -179,8 +213,8 @@ export class PrintingService {
         laborCost: payload.laborCost ?? 0,
         partsCost: payload.partsCost ?? 0,
         totalCost: payload.totalCost ?? 0,
-        estimatedDelivery: payload.estimatedDelivery?.toISOString(),
-        deliveredAt: payload.deliveredAt?.toISOString(),
+        estimatedDelivery: toCalendarDate(payload.estimatedDelivery),
+        deliveredAt: toIsoInstant(payload.deliveredAt),
         items: payload.items.map((item) => ({ ...item })),
       },
     };

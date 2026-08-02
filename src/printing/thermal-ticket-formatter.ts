@@ -4,7 +4,7 @@ export interface ThermalTicketInput {
   orderId: string;
   orderNumber: string;
   trackingToken: string;
-  createdAt?: Date;
+  createdAt?: Date | string;
   status: string;
   priority: string;
   customerId: string;
@@ -21,8 +21,8 @@ export interface ThermalTicketInput {
   laborCost?: number;
   partsCost?: number;
   totalCost?: number;
-  estimatedDelivery?: Date;
-  deliveredAt?: Date;
+  estimatedDelivery?: Date | string;
+  deliveredAt?: Date | string;
   items: Array<{
     productName: string;
     quantity: number;
@@ -190,7 +190,7 @@ export class ThermalTicketFormatter {
     return (value ?? '').replace(/\s+/g, ' ').trim();
   }
 
-  private formatDate(date?: Date): string {
+  private formatDate(date?: Date | string): string {
     if (!date) {
       return 'N/A';
     }
@@ -202,7 +202,7 @@ export class ThermalTicketFormatter {
     });
   }
 
-  private formatCalendarDate(date: Date): string {
+  private formatCalendarDate(date: Date | string): string {
     return new Date(date).toLocaleDateString('es-CL', {
       dateStyle: 'short',
       timeZone: 'UTC',
