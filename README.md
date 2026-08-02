@@ -449,7 +449,9 @@ La API **no imprime físicamente por sí sola**. Crea un trabajo correlacionado,
 
 Cada solicitud puede elegir el documento con `printerProfile`:
 
-- `thermal_escpos`: ticket de 80 mm, 40 columnas y QR mediante USB ESC/POS.
+- `thermal_escpos`: ticket de 80 mm, 40 columnas y QR. El identificador se
+  conserva por compatibilidad; el agent lo imprime mediante la cola de la
+  impresora predeterminada del sistema.
 - `system_pdf`: resumen A4 o Carta con cliente, técnico, equipo, falla,
   diagnóstico, trabajo, repuestos, costos, fechas y QR. El agent lo envía a la
   impresora predeterminada del equipo.
