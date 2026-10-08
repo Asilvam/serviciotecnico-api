@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { STATUS_LABELS, PRIORITY_LABELS } from './print-labels';
 
 export interface ThermalTicketInput {
   orderId: string;
@@ -44,8 +45,8 @@ export class ThermalTicketFormatter {
     lines.push(`Orden: ${input.orderNumber}`);
     lines.push(`ID: ${input.orderId}`);
     lines.push(`Fecha: ${this.formatDate(input.createdAt)}`);
-    lines.push(`Estado: ${input.status}`);
-    lines.push(`Prioridad: ${input.priority}`);
+    lines.push(`Estado: ${STATUS_LABELS[input.status] ?? input.status}`);
+    lines.push(`Prioridad: ${PRIORITY_LABELS[input.priority] ?? input.priority}`);
     lines.push(this.separator());
 
     lines.push('CLIENTE');

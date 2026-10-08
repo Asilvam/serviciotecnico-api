@@ -14,22 +14,7 @@ import { ThermalTicketFormatter } from './thermal-ticket-formatter';
 import type { ThermalTicketInput } from './thermal-ticket-formatter';
 import { PrintDispatchException, PrintGateway } from './print.gateway';
 import { PrintJobsService } from './print-jobs.service';
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'PENDIENTE',
-  in_progress: 'EN PROCESO',
-  waiting_parts: 'EN ESPERA DE REPUESTOS',
-  completed: 'COMPLETADA',
-  delivered: 'ENTREGADA',
-  cancelled: 'CANCELADA',
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-  low: 'BAJA',
-  medium: 'MEDIA',
-  high: 'ALTA',
-  urgent: 'URGENTE',
-};
+import { STATUS_LABELS, PRIORITY_LABELS } from './print-labels';
 
 function toIsoInstant(value?: Date | string): string | undefined {
   if (!value) {
