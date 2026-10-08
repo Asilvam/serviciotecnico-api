@@ -51,13 +51,9 @@ export class ThermalTicketFormatter {
 
     lines.push('CLIENTE');
     lines.push(`- ${input.customerName ?? 'N/A'}`);
-    lines.push(`- Id: ${input.customerId}`);
 
     lines.push('TECNICO');
     lines.push(`- ${input.technicianName ?? 'Sin asignar'}`);
-    if (input.technicianId) {
-      lines.push(`- Id: ${input.technicianId}`);
-    }
     lines.push(this.separator());
 
     lines.push('EQUIPO');
