@@ -24,8 +24,9 @@ export class Customer {
   @Column()
   name: string;
 
-  @Column({ unique: true })
-  email: string;
+  @Index('IDX_CUSTOMER_EMAIL_UNIQUE', { unique: true, sparse: true })
+  @Column({ nullable: true })
+  email?: string;
 
   @Index('IDX_CUSTOMER_RUT_UNIQUE', { unique: true, sparse: true })
   @Column({ nullable: true })

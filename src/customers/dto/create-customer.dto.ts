@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsOptional } from 'class-validator';
+import { IsEmail, IsString, IsOptional, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -8,19 +8,32 @@ import {
 
 export class CreateCustomerDto {
   @ApiProperty({ example: 'Juan Pérez' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: 'juan@example.com' })
-  @IsEmail()
-  email: string;
-
-  @ApiProperty({ example: '12.345.678-5' })
+  @ApiPropertyOptional({ example: 'juan@example.com' })
   @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? normalizeChileanRut(value) : value,
+    typeof value === 'string' ? value.trim() || undefined : value,
   )
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ example: '12.345.678-5' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string'
+      ? value.trim()
+        ? normalizeChileanRut(value)
+        : undefined
+      : value,
+  )
+  @IsOptional()
   @IsChileanRut()
-  rut: string;
+  rut?: string;
 
   @ApiPropertyOptional({ example: '+56912345678' })
   @IsOptional()

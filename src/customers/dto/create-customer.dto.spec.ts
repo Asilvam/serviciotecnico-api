@@ -27,4 +27,34 @@ describe('CreateCustomerDto', () => {
       expect.arrayContaining([expect.objectContaining({ property: 'rut' })]),
     );
   });
+  it.each([
+    { name: 'Solo nombre' },
+    { name: 'Solo nombre', email: '', rut: '' },
+    { name: 'Solo nombre', email: '   ', rut: '   ' },
+  ])('accepts optional contact fields: %o', async (input) => {
+    const dto = plainToInstance(CreateCustomerDto, input);
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.email).toBeUndefined();
+    expect(dto.rut).toBeUndefined();
+  });
+
+  it('still rejects a supplied invalid email', async () => {
+    const dto = plainToInstance(CreateCustomerDto, {
+      name: 'Cliente',
+      email: 'incorrecto',
+    });
+    expect(await validate(dto)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'email' })]),
+    );
+  });
+
+  it.each([undefined, '', '   '])(
+    'rejects a missing or blank name: %s',
+    async (name) => {
+      const dto = plainToInstance(CreateCustomerDto, { name });
+      expect(await validate(dto)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ property: 'name' })]),
+      );
+    },
+  );
 });

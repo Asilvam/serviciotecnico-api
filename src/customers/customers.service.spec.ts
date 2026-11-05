@@ -90,6 +90,28 @@ describe('CustomersService', () => {
       expect(result).toEqual(mockCustomer);
     });
 
+    it.each([
+      { name: 'Solo nombre' },
+      { name: 'Solo nombre', email: '', rut: '' },
+    ])(
+      'creates a customer without querying or storing empty identifiers: %o',
+      async (input) => {
+        mockCustomerRepository.create.mockImplementation((value) => value);
+        mockCustomerRepository.save.mockImplementation(async (value) => value);
+
+        await service.create(input);
+        await service.create({ name: 'Otro cliente sin datos de contacto' });
+
+        expect(mockCustomerRepository.findOne).not.toHaveBeenCalled();
+        expect(mockCustomerRepository.create).toHaveBeenNthCalledWith(1, {
+          name: 'Solo nombre',
+        });
+        expect(mockCustomerRepository.create).toHaveBeenNthCalledWith(2, {
+          name: 'Otro cliente sin datos de contacto',
+        });
+      },
+    );
+
     it('should throw ConflictException if email already exists', async () => {
       mockCustomerRepository.findOne.mockResolvedValue(mockCustomer);
 

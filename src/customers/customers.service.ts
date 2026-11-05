@@ -27,23 +27,34 @@ export class CustomersService {
   ) {}
 
   async create(createCustomerDto: CreateCustomerDto): Promise<Customer> {
-    const existingEmail = await this.customerRepository.findOne({
-      where: { email: createCustomerDto.email },
-    });
-    if (existingEmail) {
-      throw new ConflictException('El email ya está registrado.');
+    const { email, rut, ...details } = createCustomerDto;
+    const normalizedEmail = email?.trim() || undefined;
+    const normalizedRut = rut?.trim() ? normalizeChileanRut(rut) : undefined;
+    if (normalizedEmail) {
+      const existingEmail = await this.customerRepository.findOne({
+        where: { email: normalizedEmail },
+      });
+      if (existingEmail) {
+        throw new ConflictException('El email ya está registrado.');
+      }
     }
-    const normalizedRut = normalizeChileanRut(createCustomerDto.rut);
-    const existingRut = await this.customerRepository.findOne({
-      where: { rut: normalizedRut },
-    });
-    if (existingRut) {
-      throw new ConflictException('El RUT ya está registrado.');
+    if (normalizedRut) {
+      const existingRut = await this.customerRepository.findOne({
+        where: { rut: normalizedRut },
+      });
+      if (existingRut) {
+        throw new ConflictException('El RUT ya está registrado.');
+      }
     }
     const customer = this.customerRepository.create({
-      ...createCustomerDto,
-      rut: normalizedRut,
+      ...details,
+      ...(normalizedEmail ? { email: normalizedEmail } : {}),
+      ...(normalizedRut ? { rut: normalizedRut } : {}),
     });
+    // MongoDB sparse indexes skip missing fields, not explicit null values.
+    // Remove optional class fields so the driver does not serialize undefined as null.
+    if (!normalizedEmail) delete customer.email;
+    if (!normalizedRut) delete customer.rut;
     return this.customerRepository.save(customer);
   }
 
