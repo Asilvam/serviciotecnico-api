@@ -14,6 +14,17 @@ describe('CreateCustomerDto', () => {
     expect(dto.rut).toBe('12345678-5');
   });
 
+  it.each([
+    ['alejandro silva monsalve', 'Alejandro Silva Monsalve'],
+    ['  ALEJANDRO   SILVA  MONSALVE ', 'Alejandro Silva Monsalve'],
+    ['josé muñoz pérez', 'José Muñoz Pérez'],
+    ["maría-josé o'connor", "María-José O'Connor"],
+  ])('formats the customer name %s', async (name, expected) => {
+    const dto = plainToInstance(CreateCustomerDto, { name });
+    expect(dto.name).toBe(expected);
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+
   it('rejects an invalid Chilean RUT', async () => {
     const dto = plainToInstance(CreateCustomerDto, {
       name: 'Juan Pérez',

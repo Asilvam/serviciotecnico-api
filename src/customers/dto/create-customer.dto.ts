@@ -1,3 +1,4 @@
+import { formatCustomerName } from '../../common/customer-name.util';
 import { IsEmail, IsString, IsOptional, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -9,7 +10,7 @@ import {
 export class CreateCustomerDto {
   @ApiProperty({ example: 'Juan Pérez' })
   @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
+    typeof value === 'string' ? formatCustomerName(value) : value,
   )
   @IsString()
   @IsNotEmpty()
