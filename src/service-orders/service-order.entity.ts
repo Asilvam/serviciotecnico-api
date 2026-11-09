@@ -69,6 +69,12 @@ export class ServiceOrder {
   deviceModel: string;
 
   @Column({ nullable: true })
+  deviceBrandId?: string | null;
+
+  @Column({ nullable: true })
+  deviceModelId?: string | null;
+
+  @Column({ nullable: true })
   serialNumber: string;
 
   @Column({ type: 'text' })

@@ -1,3 +1,4 @@
+import { DeviceCatalogModule } from '../device-catalog/device-catalog.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ServiceOrdersController } from './service-orders.controller';
@@ -14,6 +15,7 @@ import { PublicTrackingController } from './public-tracking.controller';
   imports: [
     TypeOrmModule.forFeature([ServiceOrder, Customer, Technician, Product]),
     PrintingModule,
+    DeviceCatalogModule,
     AuditModule,
   ],
   controllers: [ServiceOrdersController, PublicTrackingController],

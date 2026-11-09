@@ -60,6 +60,16 @@ export class CreateServiceOrderDto {
   @IsString()
   deviceModel?: string;
 
+  @ApiPropertyOptional({ description: 'Referencia opcional al catálogo local' })
+  @IsOptional()
+  @IsMongoId()
+  deviceBrandId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Modelo de la marca seleccionada' })
+  @IsOptional()
+  @IsMongoId()
+  deviceModelId?: string | null;
+
   @ApiPropertyOptional({ example: 'ABC123456' })
   @IsOptional()
   @IsString()

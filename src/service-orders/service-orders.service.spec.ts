@@ -1,3 +1,4 @@
+import { DeviceCatalogService } from '../device-catalog/device-catalog.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -87,6 +88,14 @@ describe('ServiceOrdersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ServiceOrdersService,
+        {
+          provide: DeviceCatalogService,
+          useValue: {
+            rememberManual: jest.fn().mockResolvedValue(undefined),
+            resolveOrder: jest.fn().mockResolvedValue({}),
+            resolveUpdate: jest.fn().mockResolvedValue({}),
+          },
+        },
         {
           provide: getRepositoryToken(ServiceOrder),
           useValue: mockOrderRepository,

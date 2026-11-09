@@ -1,3 +1,4 @@
+import { DeviceCatalogModule } from './device-catalog/device-catalog.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -35,6 +36,7 @@ import { validateEnvironment } from './config/environment.config';
     TechniciansModule,
     ProductsModule,
     PrintingModule,
+    DeviceCatalogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

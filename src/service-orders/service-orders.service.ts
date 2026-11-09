@@ -1,3 +1,4 @@
+import { DeviceCatalogService } from '../device-catalog/device-catalog.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -63,6 +64,7 @@ export class ServiceOrdersService {
     private productRepository: Repository<Product>,
     private auditService: AuditService,
     private configService: ConfigService,
+    private deviceCatalog: DeviceCatalogService,
   ) {}
 
   private getActorRole(actor?: AuditActor): UserRole {
@@ -194,6 +196,8 @@ export class ServiceOrdersService {
           'deviceType',
           'deviceBrand',
           'deviceModel',
+          'deviceBrandId',
+          'deviceModelId',
           'serialNumber',
           'problemDescription',
         ].forEach((field) =>
@@ -480,10 +484,12 @@ export class ServiceOrdersService {
     await this.assertCustomerAvailable(orderData.customerId);
     await this.assertTechnicianAvailable(orderData.technicianId);
 
+    const catalogValues = await this.deviceCatalog.resolveOrder(orderData);
     const inventoryPlan = await this.prepareInventoryPlan([], items ?? []);
 
     const order = this.serviceOrderRepository.create({
       ...orderData,
+      ...catalogValues,
       orderNumber: this.generateOrderNumber(),
       status: ServiceOrderStatus.PENDING,
     });
@@ -507,6 +513,7 @@ export class ServiceOrdersService {
       await this.rollbackInventoryPlan(inventoryPlan);
       throw error;
     }
+    await this.deviceCatalog.rememberManual(savedOrder);
     this.logger.log(
       `service_order.created orderId=${savedOrder.id ?? 'unknown'} orderNumber=${savedOrder.orderNumber}`,
     );
@@ -537,7 +544,9 @@ export class ServiceOrdersService {
     customerId?: string,
   ): Promise<ServiceOrderView[]> {
     const role = this.getActorRole(actor);
-    const where: Partial<ServiceOrder> = {};
+    const where: Partial<
+      Pick<ServiceOrder, 'status' | 'customerId' | 'technicianId'>
+    > = {};
     if (status) {
       where.status = status;
     }
@@ -626,7 +635,11 @@ export class ServiceOrdersService {
     ) {
       await this.assertTechnicianAvailable(permittedUpdate.technicianId);
     }
-    Object.assign(order, updateData);
+    const catalogValues = await this.deviceCatalog.resolveUpdate(
+      order,
+      updateData,
+    );
+    Object.assign(order, updateData, catalogValues);
 
     if (permittedUpdate.laborCost !== undefined) {
       order.totalCost = (permittedUpdate.laborCost || 0) + order.partsCost;
@@ -660,6 +673,16 @@ export class ServiceOrdersService {
       }
       throw error;
     }
+    if (
+      [
+        'deviceType',
+        'deviceBrand',
+        'deviceModel',
+        'deviceBrandId',
+        'deviceModelId',
+      ].some((key) => Object.prototype.hasOwnProperty.call(updateData, key))
+    )
+      await this.deviceCatalog.rememberManual(savedOrder);
     this.logger.log(
       `service_order.updated orderId=${savedOrder.id ?? id} status=${previousStatus}->${savedOrder.status}`,
     );
