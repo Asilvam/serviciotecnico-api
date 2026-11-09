@@ -40,3 +40,7 @@ Las marcas y modelos se consultan completos y se guardan en caché de memoria po
 Al guardar correctamente una orden con datos manuales de un celular, se agregan los nombres al catálogo con operaciones upsert e índices únicos. Se normalizan a mayúsculas y no se duplican diferencias de espacios o mayúsculas. No se reactivan marcas o modelos deshabilitados ni se inventan códigos de hardware. La caché del cliente se invalida después del guardado manual para mostrar los nuevos valores en la próxima consulta. No se agregan datos de otras categorías al catálogo de celulares.
 
 Si falla temporalmente la incorporación al catálogo después de guardar la orden, se registra una advertencia en la API; la orden ya guardada se conserva. No hay importador ni pantalla de administración.
+
+## Etiqueta Modelo y control deshabilitado
+
+El campo se presenta como «Modelo», sin el sufijo «(opcional)». Antes de elegir Marca muestra «Primero elige una marca»; después, «Selecciona un modelo». El modelo sigue sin ser obligatorio. El selector nativo auxiliar de validación solo existe para campos obligatorios y permanece recortado e invisible: los estilos de controles deshabilitados ya no generan un segundo desplegable sobre la etiqueta. La opción del desplegable «Continuar sin modelo» permite omitirlo explícitamente.

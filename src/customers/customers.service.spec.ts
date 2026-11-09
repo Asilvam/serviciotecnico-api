@@ -104,10 +104,10 @@ describe('CustomersService', () => {
 
         expect(mockCustomerRepository.findOne).not.toHaveBeenCalled();
         expect(mockCustomerRepository.create).toHaveBeenNthCalledWith(1, {
-          name: 'Solo nombre',
+          name: 'Solo Nombre',
         });
         expect(mockCustomerRepository.create).toHaveBeenNthCalledWith(2, {
-          name: 'Otro cliente sin datos de contacto',
+          name: 'Otro Cliente Sin Datos De Contacto',
         });
       },
     );
@@ -157,6 +157,16 @@ describe('CustomersService', () => {
   });
 
   describe('findAll', () => {
+    it('returns customers alphabetically using Spanish names', async () => {
+      mockCustomerRepository.find.mockResolvedValue([
+        { ...mockCustomer, name: 'Pedro Solis' },
+        { ...mockCustomer, name: 'Álvaro Pérez' },
+        { ...mockCustomer, name: 'Alejandro Silva' },
+      ]);
+      expect(
+        (await service.findAll()).map((customer) => customer.name),
+      ).toEqual(['Alejandro Silva', 'Álvaro Pérez', 'Pedro Solis']);
+    });
     it('should return all active customers', async () => {
       mockCustomerRepository.find.mockResolvedValue([
         mockCustomer,

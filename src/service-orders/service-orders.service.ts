@@ -1,3 +1,7 @@
+import {
+  todayInChile,
+  validateEstimatedDelivery,
+} from './estimated-delivery-date';
 import { DeviceCatalogService } from '../device-catalog/device-catalog.service';
 import {
   BadRequestException,
@@ -481,6 +485,8 @@ export class ServiceOrdersService {
       );
     }
 
+    const estimatedDelivery = orderData.estimatedDelivery || todayInChile();
+    validateEstimatedDelivery(estimatedDelivery);
     await this.assertCustomerAvailable(orderData.customerId);
     await this.assertTechnicianAvailable(orderData.technicianId);
 
@@ -489,6 +495,7 @@ export class ServiceOrdersService {
 
     const order = this.serviceOrderRepository.create({
       ...orderData,
+      estimatedDelivery: new Date(estimatedDelivery),
       ...catalogValues,
       orderNumber: this.generateOrderNumber(),
       status: ServiceOrderStatus.PENDING,
@@ -620,6 +627,10 @@ export class ServiceOrdersService {
       order,
       updateServiceOrderDto,
       actor,
+    );
+    validateEstimatedDelivery(
+      permittedUpdate.estimatedDelivery,
+      order.estimatedDelivery,
     );
     const previousStatus = order.status;
     const { items, ...updateData } = permittedUpdate;

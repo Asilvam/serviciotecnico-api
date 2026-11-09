@@ -1,3 +1,4 @@
+import { formatCustomerName } from '../common/customer-name.util';
 import {
   Injectable,
   NotFoundException,
@@ -48,6 +49,7 @@ export class CustomersService {
     }
     const customer = this.customerRepository.create({
       ...details,
+      name: formatCustomerName(details.name),
       ...(normalizedEmail ? { email: normalizedEmail } : {}),
       ...(normalizedRut ? { rut: normalizedRut } : {}),
     });
@@ -60,9 +62,15 @@ export class CustomersService {
 
   async findAll(includeInactive = false): Promise<Customer[]> {
     const customers = await this.customerRepository.find();
-    return includeInactive
+    const visible = includeInactive
       ? customers
       : customers.filter((customer) => customer.isActive !== false);
+    return visible.sort((a, b) =>
+      a.name.localeCompare(b.name, 'es', {
+        sensitivity: 'base',
+        numeric: true,
+      }),
+    );
   }
 
   async findOne(id: string): Promise<Customer> {
@@ -111,6 +119,9 @@ export class CustomersService {
       }
     }
     Object.assign(customer, updateCustomerDto, {
+      ...(typeof updateCustomerDto.name === 'string'
+        ? { name: formatCustomerName(updateCustomerDto.name) }
+        : {}),
       ...(normalizedRut ? { rut: normalizedRut } : {}),
     });
     return this.customerRepository.save(customer);
