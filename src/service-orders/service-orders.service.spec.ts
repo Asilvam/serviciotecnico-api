@@ -1,3 +1,5 @@
+import { plainToInstance } from 'class-transformer';
+import { UpdateServiceOrderDto } from './dto/update-service-order.dto';
 import { DeviceCatalogService } from '../device-catalog/device-catalog.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -545,6 +547,26 @@ describe('ServiceOrdersService', () => {
   });
 
   describe('update permissions', () => {
+    it('preserves omitted fields from transformed partial update DTOs', async () => {
+      const order = { ...mockOrder, deviceType: 'CELULAR', deviceBrand: 'VIVO' };
+      mockOrderRepository.findOne.mockResolvedValue(order);
+      mockOrderRepository.save.mockImplementation(value => Promise.resolve(value));
+      const dto = plainToInstance(UpdateServiceOrderDto, { deviceModel: 'V40' });
+      expect(Object.hasOwn(dto, 'deviceType')).toBe(true);
+      const result = await service.update(order.id, dto, adminActor);
+      expect(result.deviceModel).toBe('V40');
+      expect(result.deviceType).toBe('CELULAR');
+      expect(result.customerId).toBe(mockOrder.customerId);
+      expect(result.deviceBrand).toBe('VIVO');
+      expect(result.problemDescription).toBe(mockOrder.problemDescription);
+      expect(result.priority).toBe(mockOrder.priority);
+      expect(result.status).toBe(mockOrder.status);
+      expect(mockAuditService.record).toHaveBeenCalledWith(
+        'service_order.updated', 'service_order', expect.any(String), adminActor,
+        expect.objectContaining({ fields: ['deviceModel'] }),
+      );
+    });
+
     it('should apply and audit only fields that actually changed for admin', async () => {
       const order = { ...mockOrder };
       mockOrderRepository.findOne.mockResolvedValue(order);

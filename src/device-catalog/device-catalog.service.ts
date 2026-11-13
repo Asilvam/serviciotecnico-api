@@ -238,7 +238,10 @@ export class DeviceCatalogService implements OnModuleInit {
       )
     )
       return {};
-    const effective = { ...order, ...update };
+    const definedUpdate = Object.fromEntries(
+      Object.entries(update).filter(([, value]) => value !== undefined),
+    );
+    const effective: DeviceInput = { ...order, ...definedUpdate };
     const changedType =
       update.deviceType !== undefined && update.deviceType !== order.deviceType;
     const manualBrandChange =

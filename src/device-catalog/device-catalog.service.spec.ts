@@ -29,6 +29,17 @@ function setup() {
   return { service, brands, models };
 }
 describe('device catalog integration', () => {
+  it('keeps the stored category and brand when optional update fields are undefined', async () => {
+    const { service } = setup();
+    await expect(service.resolveUpdate(
+      { deviceType: 'CELULAR', deviceBrandId: brandId },
+      { deviceType: undefined, deviceBrandId: undefined, deviceModelId: modelId },
+    )).resolves.toMatchObject({
+      deviceBrandId: brandId, deviceModelId: modelId,
+      deviceBrand: 'SAMSUNG', deviceModel: 'GALAXY A04',
+    });
+  });
+
   it('orders brands by the published world shipment ranking across pages', async () => {
     const { service, brands } = setup();
     const rows = [

@@ -104,7 +104,10 @@ export class ServiceOrdersService {
     dto: UpdateServiceOrderDto,
     allowedFields: Set<keyof UpdateServiceOrderDto>,
   ): UpdateServiceOrderDto {
-    const fields = Object.keys(dto) as Array<keyof UpdateServiceOrderDto>;
+    // Transformed DTO instances own optional properties even when PATCH omitted them.
+    const fields = (Object.keys(dto) as Array<keyof UpdateServiceOrderDto>).filter(
+      field => dto[field] !== undefined,
+    );
     const changedAllowedFields = fields.filter(
       (field) =>
         allowedFields.has(field) &&
